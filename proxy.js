@@ -6,8 +6,12 @@ const cors = require('cors');
 const API_KEY = '9X/bK+BuRLK8mOslIvs9TA=='; // Use your actual API key here
 const PORT = 3000;
 
+
+const path = require('path');
 const app = express();
 app.use(cors());
+// Serve static files from the public directory
+app.use(express.static(path.join(__dirname, 'public')));
 
 app.get('/bus-arrival', async (req, res) => {
     const busStopCode = req.query.BusStopCode;
