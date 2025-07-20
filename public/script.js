@@ -1,7 +1,7 @@
 
 const BUS_STOP_CODE = "43471";
 const BUS_NUMBERS = ["947", "985", "187"];
-const API_URL = `http://localhost:3000/bus-arrival?BusStopCode=${BUS_STOP_CODE}`;
+const API_URL = `https://bus-arrival.onrender.com/bus-arrival?BusStopCode=${BUS_STOP_CODE}`;
 
 function fetchBusTimes() {
     // Set all cells to Loading...
