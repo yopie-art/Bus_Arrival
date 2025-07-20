@@ -5,12 +5,26 @@ body {
     padding: 0;
 }
 .container {
-    max-width: 400px;
-    margin: 40px auto;
+    max-width: 500px;
+    margin: 20px auto;
     background: #fff;
-    padding: 24px;
+    padding: 12px;
     border-radius: 8px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+@media (max-width: 600px) {
+    .container {
+        max-width: 98vw;
+        padding: 4vw;
+    }
+    .bus-table th, .bus-table td {
+        padding: 2vw 1vw;
+        font-size: 4vw;
+    }
+    h1 {
+        font-size: 6vw;
+    }
 }
 h1 {
     text-align: center;
