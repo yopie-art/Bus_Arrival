@@ -1,6 +1,6 @@
 
 const BUS_STOP_CODE = "43471";
-const BUS_NUMBERS = ["947", "985", "187"];
+const BUS_NUMBERS = ["947", "985", "187", "868E"];
 const API_URL = `https://bus-arrival.onrender.com/bus-arrival?BusStopCode=${BUS_STOP_CODE}`;
 
 function fetchBusTimes() {
