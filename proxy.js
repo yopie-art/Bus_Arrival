@@ -32,6 +32,20 @@ async function fetchAllBusStops() {
     cachedBusStopsTime = now;
     return allStops;
 }
+// Simple Node.js Express proxy for LTA DataMall Bus Arrival API
+const express = require('express');
+const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
+const cors = require('cors');
+
+// API_KEY is already declared above
+const PORT = 3000;
+
+const path = require('path');
+const app = express();
+app.use(cors());
+// Serve static files from the public directory
+app.use(express.static(path.join(__dirname, 'public')));
+
 // API endpoint to get bus stop description(s)
 app.get('/bus-stop-description', async (req, res) => {
     let codes = req.query.codes;
@@ -52,20 +66,6 @@ app.get('/bus-stop-description', async (req, res) => {
         res.status(500).json({ error: 'Failed to fetch bus stop descriptions' });
     }
 });
-// Simple Node.js Express proxy for LTA DataMall Bus Arrival API
-const express = require('express');
-const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
-const cors = require('cors');
-
-// API_KEY is already declared above
-const PORT = 3000;
-
-
-const path = require('path');
-const app = express();
-app.use(cors());
-// Serve static files from the public directory
-app.use(express.static(path.join(__dirname, 'public')));
 
 app.get('/bus-arrival', async (req, res) => {
     const busStopCode = req.query.BusStopCode;
