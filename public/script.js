@@ -1,3 +1,19 @@
+// Fetch and display bus stop descriptions
+function fetchBusStopDescriptions() {
+  const stopCodes = TABLES.map(t => t.stopCode).join(',');
+  fetch(`/bus-stop-description?codes=${stopCodes}`)
+    .then(res => res.json())
+    .then(descs => {
+      TABLES.forEach(t => {
+        const desc = descs[t.stopCode] || t.stopCode;
+        const h1 = document.getElementById(`desc-${t.stopCode}`);
+        if (h1) h1.textContent = `Bus Arrival Times for ${desc}`;
+      });
+    })
+    .catch(() => {
+      // fallback: leave as is
+    });
+}
 
 
 const TABLES = [
@@ -76,6 +92,7 @@ function getMinutesToArrival(estimatedArrival) {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
+    fetchBusStopDescriptions();
     fetchBusTimes();
     setInterval(fetchBusTimes, 10000); // Refresh every 10 seconds
 });
