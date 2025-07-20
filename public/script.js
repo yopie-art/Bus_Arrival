@@ -63,4 +63,7 @@ function getMinutesToArrival(estimatedArrival) {
     return Math.max(0, Math.round(diffMs / 60000));
 }
 
-document.addEventListener("DOMContentLoaded", fetchBusTimes);
+document.addEventListener("DOMContentLoaded", () => {
+    fetchBusTimes();
+    setInterval(fetchBusTimes, 10000); // Refresh every 10 seconds
+});
