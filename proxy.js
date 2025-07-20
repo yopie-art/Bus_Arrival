@@ -1,4 +1,5 @@
 // Remove static bus stop lookup, add dynamic fetch
+const API_KEY = process.env.LTA_API_KEY || '9X/bK+BuRLK8mOslIvs9TA==';
 const BUS_STOPS_API = 'https://datamall2.mytransport.sg/ltaodataservice/BusStops';
 
 // In-memory cache for bus stops
