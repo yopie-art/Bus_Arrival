@@ -39,7 +39,7 @@ function fetchBusTimes() {
                             ddIcon = `<svg class='dd-icon' viewBox='0 0 24 24' fill='currentColor'><rect x='2' y='4' width='20' height='7' rx='2' fill='#1976d2'/><rect x='2' y='13' width='20' height='7' rx='2' fill='#1976d2'/><rect x='4' y='6' width='16' height='3' rx='1' fill='#fff'/><rect x='4' y='15' width='16' height='3' rx='1' fill='#fff'/></svg>`;
                         }
 
-                        arrivalElem.innerHTML = `<span class='${loadClass}'>${eta} min${ddIcon}</span>`;
+                        arrivalElem.innerHTML = `<span class='arrival ${loadClass}'>${eta} min${ddIcon}</span>`;
                     } else {
                         arrivalElem.innerHTML = "No data";
                     }
