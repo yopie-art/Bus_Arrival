@@ -19,7 +19,7 @@ function fetchBusStopDescriptions() {
 const TABLES = [
   {
     stopCode: "43479",
-    buses: ["188", "985", "187"],
+    buses: ["188", "985", "187", "947"],
     prefix: "bus-43479-"
   },
   {
