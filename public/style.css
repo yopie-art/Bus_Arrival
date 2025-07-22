@@ -1,16 +1,17 @@
 body {
     font-family: Arial, sans-serif;
-    background: #f4f4f4;
+    background: #1a1a1a;
+    color: #ffffff;
     margin: 0;
     padding: 0;
 }
 .container {
-    max-width: 500px;
+    max-width: 800px;
     margin: 20px auto;
-    background: #fff;
+    background: #2d2d2d;
     padding: 12px;
     border-radius: 8px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
 }
 
 @media (max-width: 600px) {
@@ -28,7 +29,7 @@ body {
 }
 h1 {
     text-align: center;
-    color: #333;
+    color: #ffffff;
 }
 .bus {
     margin: 16px 0;
@@ -37,10 +38,10 @@ h1 {
 .arrival {
     font-weight: bold;
 }
-.arrival.green { color: #28a745; }
-.arrival.orange { color: #ff9800; }
-.arrival.red { color: #e53935; }
-.arrival.blue { color: #007bff; }
+.arrival.green { color: #4ade80; }
+.arrival.orange { color: #fb923c; }
+.arrival.red { color: #f87171; }
+.arrival.blue { color: #60a5fa; }
 
 .bus-table {
     width: 100%;
@@ -49,15 +50,16 @@ h1 {
     margin-bottom: 16px;
 }
 .bus-table th, .bus-table td {
-    border: 1px solid #ddd;
+    border: 1px solid #555;
     padding: 8px;
     text-align: center;
+    color: #ffffff;
 }
 .bus-table th {
-    background: #f4f4f4;
+    background: #404040;
 }
 .bus-table td {
-    background: #fff;
+    background: #333333;
 }
 .dd-icon {
     display: inline-block;
