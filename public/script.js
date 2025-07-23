@@ -33,13 +33,6 @@ const API_BASE = "https://bus-arrival.onrender.com/bus-arrival?BusStopCode=";
 
 function fetchBusTimes() {
   TABLES.forEach(table => {
-    table.buses.forEach(busNo => {
-      for (let i = 1; i <= 3; i++) {
-        const elemId = `${table.prefix}${busNo}-${i}`;
-        const elem = document.getElementById(elemId);
-        if (elem) elem.innerHTML = "Loading...";
-      }
-    });
     fetch(API_BASE + table.stopCode)
       .then(response => response.json())
       .then(data => {
@@ -54,6 +47,9 @@ function fetchBusTimes() {
               if (i === 2) nextBus = bus.NextBus2;
               if (i === 3) nextBus = bus.NextBus3;
             }
+            
+            let newContent;
+            let dataKey; // Key to compare actual data changes
             if (nextBus && nextBus.EstimatedArrival) {
               const eta = getMinutesToArrival(nextBus.EstimatedArrival);
               let loadClass = "blue";
@@ -64,9 +60,26 @@ function fetchBusTimes() {
               if (nextBus.Type === "DD") {
                 ddIcon = `<svg class='dd-icon' viewBox='0 0 24 24' fill='currentColor'><rect x='2' y='4' width='20' height='7' rx='2' fill='#1976d2'/><rect x='2' y='13' width='20' height='7' rx='2' fill='#1976d2'/><rect x='4' y='6' width='16' height='3' rx='1' fill='#fff'/><rect x='4' y='15' width='16' height='3' rx='1' fill='#fff'/></svg>`;
               }
-              arrivalElem.innerHTML = `<span class='arrival ${loadClass}'>${eta} min${ddIcon}</span>`;
+              newContent = `<span class='arrival ${loadClass}'>${eta} min${ddIcon}</span>`;
+              dataKey = `${eta}-${loadClass}-${nextBus.Type || 'SD'}`;
             } else {
-              arrivalElem.innerHTML = "No data";
+              newContent = "No data";
+              dataKey = "no-data";
+            }
+            
+            // Compare with stored data key instead of HTML content
+            const currentDataKey = arrivalElem.getAttribute('data-key');
+            if (arrivalElem && currentDataKey !== dataKey) {
+              // Store the new data key
+              arrivalElem.setAttribute('data-key', dataKey);
+              
+              // Add fade effect for smooth transition
+              arrivalElem.classList.add('updating');
+              
+              setTimeout(() => {
+                arrivalElem.innerHTML = newContent;
+                arrivalElem.classList.remove('updating');
+              }, 500); // Half of the 1-second transition
             }
           }
         });
@@ -77,7 +90,10 @@ function fetchBusTimes() {
           for (let i = 1; i <= 3; i++) {
             const elemId = `${table.prefix}${busNo}-${i}`;
             const elem = document.getElementById(elemId);
-            if (elem) elem.textContent = "Error";
+            if (elem && elem.getAttribute('data-key') !== "error") {
+              elem.setAttribute('data-key', "error");
+              elem.textContent = "Error";
+            }
           }
         });
       });

@@ -82,3 +82,12 @@ button {
 button:hover {
     background: #0056b3;
 }
+
+/* Fade transition for arrival time updates */
+.arrival-cell {
+    transition: opacity 0.5s ease-in-out;
+}
+
+.arrival-cell.updating {
+    opacity: 0.3;
+}
