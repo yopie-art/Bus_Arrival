@@ -19,37 +19,56 @@ function fetchBusStopDescriptions() {
 const TABLES = [
   {
     stopCode: "43479",
-    buses: ["188", "985", "187", "947"],
     prefix: "bus-43479-"
   },
   {
     stopCode: "43471",
-    buses: ["947", "985", "187", "868E"],
     prefix: "bus-"
   }
 ];
 const API_BASE = "https://bus-arrival.onrender.com/bus-arrival?BusStopCode=";
 
+let busStopServices = {}; // Cache for bus services at each stop
 
 function fetchBusTimes() {
   TABLES.forEach(table => {
     fetch(API_BASE + table.stopCode)
       .then(response => response.json())
       .then(data => {
-        table.buses.forEach(busNo => {
-          const bus = data.Services.find(s => s.ServiceNo === busNo);
+        // Get all available bus services for this stop
+        const availableServices = data.Services || [];
+        const serviceNumbers = availableServices.map(s => s.ServiceNo).sort((a, b) => {
+          // Sort numerically, then alphabetically
+          const aNum = parseInt(a);
+          const bNum = parseInt(b);
+          if (!isNaN(aNum) && !isNaN(bNum)) {
+            return aNum - bNum;
+          }
+          return a.localeCompare(b);
+        });
+        
+        // Update the table structure if services changed
+        if (!busStopServices[table.stopCode] || 
+            JSON.stringify(busStopServices[table.stopCode]) !== JSON.stringify(serviceNumbers)) {
+          busStopServices[table.stopCode] = serviceNumbers;
+          updateTableStructure(table, serviceNumbers);
+        }
+        
+        // Update arrival times for each service
+        availableServices.forEach(service => {
+          const busNo = service.ServiceNo;
           for (let i = 1; i <= 3; i++) {
             const elemId = `${table.prefix}${busNo}-${i}`;
             const arrivalElem = document.getElementById(elemId);
+            if (!arrivalElem) continue;
+            
             let nextBus = null;
-            if (bus) {
-              if (i === 1) nextBus = bus.NextBus;
-              if (i === 2) nextBus = bus.NextBus2;
-              if (i === 3) nextBus = bus.NextBus3;
-            }
+            if (i === 1) nextBus = service.NextBus;
+            if (i === 2) nextBus = service.NextBus2;
+            if (i === 3) nextBus = service.NextBus3;
             
             let newContent;
-            let dataKey; // Key to compare actual data changes
+            let dataKey;
             if (nextBus && nextBus.EstimatedArrival) {
               const eta = getMinutesToArrival(nextBus.EstimatedArrival);
               let loadClass = "blue";
@@ -79,14 +98,16 @@ function fetchBusTimes() {
               setTimeout(() => {
                 arrivalElem.innerHTML = newContent;
                 arrivalElem.classList.remove('updating');
-              }, 500); // Half of the 1-second transition
+              }, 500);
             }
           }
         });
       })
       .catch((err) => {
         console.error("Fetch error:", err);
-        table.buses.forEach(busNo => {
+        // Handle error for existing services only
+        const existingServices = busStopServices[table.stopCode] || [];
+        existingServices.forEach(busNo => {
           for (let i = 1; i <= 3; i++) {
             const elemId = `${table.prefix}${busNo}-${i}`;
             const elem = document.getElementById(elemId);
@@ -97,6 +118,36 @@ function fetchBusTimes() {
           }
         });
       });
+  });
+}
+
+function updateTableStructure(table, serviceNumbers) {
+  // Find the table body for this stop
+  let tableBody;
+  if (table.stopCode === "43479") {
+    tableBody = document.querySelector('#bus-times-43479 tbody');
+  } else {
+    tableBody = document.querySelector('#bus-times tbody');
+  }
+  
+  if (!tableBody) return;
+  
+  // Clear existing rows
+  tableBody.innerHTML = '';
+  
+  // Create rows for each service
+  serviceNumbers.forEach(busNo => {
+    const row = document.createElement('tr');
+    row.id = `row-${table.prefix.replace('bus-', '')}${busNo}`;
+    
+    row.innerHTML = `
+      <td>${busNo}</td>
+      <td class="arrival arrival-cell" id="${table.prefix}${busNo}-1">Loading...</td>
+      <td class="arrival arrival-cell" id="${table.prefix}${busNo}-2">Loading...</td>
+      <td class="arrival arrival-cell" id="${table.prefix}${busNo}-3">Loading...</td>
+    `;
+    
+    tableBody.appendChild(row);
   });
 }
 
@@ -111,4 +162,36 @@ document.addEventListener("DOMContentLoaded", () => {
     fetchBusStopDescriptions();
     fetchBusTimes();
     setInterval(fetchBusTimes, 10000); // Refresh every 10 seconds
+    
+    // Setup settings button proximity effect
+    setupSettingsProximity();
 });
+
+function setupSettingsProximity() {
+    const settingsLink = document.querySelector('.settings-link');
+    if (!settingsLink) return;
+    
+    let isNearby = false;
+    
+    document.addEventListener('mousemove', (e) => {
+        const rect = settingsLink.getBoundingClientRect();
+        const buttonCenterX = rect.left + rect.width / 2;
+        const buttonCenterY = rect.top + rect.height / 2;
+        
+        // Calculate distance from mouse to button center
+        const distance = Math.sqrt(
+            Math.pow(e.clientX - buttonCenterX, 2) + 
+            Math.pow(e.clientY - buttonCenterY, 2)
+        );
+        
+        // Half button size distance (approximately 25px)
+        const proximityDistance = Math.max(rect.width, rect.height) / 2 + 25;
+        
+        const shouldBeNearby = distance <= proximityDistance;
+        
+        if (shouldBeNearby !== isNearby) {
+            isNearby = shouldBeNearby;
+            settingsLink.classList.toggle('nearby', isNearby);
+        }
+    });
+}

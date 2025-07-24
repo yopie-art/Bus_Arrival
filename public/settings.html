@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bus Arrival Settings</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .settings-container {
+            max-width: 600px;
+            margin: 40px auto;
+            padding: 30px;
+        }
+        
+        .setting-group {
+            margin-bottom: 30px;
+            position: relative;
+        }
+        
+        .setting-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #ffffff;
+        }
+        
+        .search-container {
+            position: relative;
+        }
+        
+        .search-input {
+            width: 100%;
+            padding: 10px;
+            border-radius: 6px;
+            border: 1px solid #555;
+            background: #333333;
+            color: #ffffff;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        
+        .search-input:focus {
+            outline: none;
+            border-color: #60a5fa;
+            box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.2);
+        }
+        
+        .search-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            max-height: 200px;
+            overflow-y: auto;
+            background: #333333;
+            border: 1px solid #555;
+            border-top: none;
+            border-radius: 0 0 6px 6px;
+            z-index: 1000;
+            display: none;
+        }
+        
+        .search-option {
+            padding: 10px;
+            cursor: pointer;
+            border-bottom: 1px solid #444;
+            color: #ffffff;
+        }
+        
+        .search-option:hover {
+            background: #404040;
+        }
+        
+        .search-option:last-child {
+            border-bottom: none;
+        }
+        
+        .search-option.selected {
+            background: #60a5fa;
+        }
+        
+        .no-results {
+            padding: 10px;
+            color: #888;
+            font-style: italic;
+        }
+        
+        .back-link {
+            display: inline-block;
+            margin-bottom: 20px;
+            color: #60a5fa;
+            text-decoration: none;
+            font-size: 16px;
+        }
+        
+        .back-link:hover {
+            text-decoration: underline;
+        }
+        
+        .loading {
+            color: #888;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+    <div class="settings-container">
+        <a href="index.html" class="back-link">← Back to Bus Arrivals</a>
+        
+        <h1>Settings</h1>
+        
+        <div class="setting-group">
+            <label for="busStop1">Bus Stop 1:</label>
+            <div class="search-container">
+                <input type="text" id="busStop1" class="search-input" placeholder="Type to search bus stops..." autocomplete="off">
+                <div id="dropdown1" class="search-dropdown"></div>
+            </div>
+        </div>
+        
+        <div class="setting-group">
+            <label for="busStop2">Bus Stop 2:</label>
+            <div class="search-container">
+                <input type="text" id="busStop2" class="search-input" placeholder="Type to search bus stops..." autocomplete="off">
+                <div id="dropdown2" class="search-dropdown"></div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="settings.js"></script>
+</body>
+</html>

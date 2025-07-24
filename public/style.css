@@ -91,3 +91,30 @@ button:hover {
 .arrival-cell.updating {
     opacity: 0.3;
 }
+
+/* Settings link in bottom right corner */
+.settings-link {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: #404040;
+    color: #ffffff;
+    padding: 10px 15px;
+    border-radius: 8px;
+    text-decoration: none;
+    font-size: 14px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    transition: all 0.3s ease;
+    opacity: 0.2;
+}
+
+.settings-link:hover {
+    background: #555555;
+    color: #ffffff;
+    text-decoration: none;
+}
+
+.settings-link.nearby {
+    opacity: 1;
+    transform: scale(1.05);
+}

@@ -51,13 +51,21 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.get('/bus-stop-description', async (req, res) => {
     let codes = req.query.codes;
     if (!codes) return res.status(400).json({ error: 'codes query param required' });
-    if (!Array.isArray(codes)) codes = codes.split(',');
+    
     try {
         const stops = await fetchAllBusStops();
         const stopMap = {};
         for (const stop of stops) {
             stopMap[stop.BusStopCode] = stop.Description;
         }
+        
+        // Handle "all" parameter for settings page
+        if (codes === 'all') {
+            return res.json(stopMap);
+        }
+        
+        // Handle specific codes
+        if (!Array.isArray(codes)) codes = codes.split(',');
         const result = {};
         codes.forEach(code => {
             result[code] = stopMap[code] || null;
@@ -65,6 +73,16 @@ app.get('/bus-stop-description', async (req, res) => {
         res.json(result);
     } catch (e) {
         res.status(500).json({ error: 'Failed to fetch bus stop descriptions' });
+    }
+});
+
+// API endpoint to get all bus stops (for settings page)
+app.get('/bus-stops-all', async (req, res) => {
+    try {
+        const stops = await fetchAllBusStops();
+        res.json(stops);
+    } catch (e) {
+        res.status(500).json({ error: 'Failed to fetch bus stops' });
     }
 });
 
