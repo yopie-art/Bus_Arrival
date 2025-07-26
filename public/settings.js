@@ -64,6 +64,22 @@ async function loadBusStops() {
 
 async function loadExistingSelections() {
     try {
+        // First try to load from localStorage
+        const localSelections = localStorage.getItem('busStopSelections');
+        if (localSelections) {
+            const selections = JSON.parse(localSelections);
+            if (Array.isArray(selections) && selections.length > 0) {
+                selections.forEach(selection => {
+                    if (selection.code && selection.description) {
+                        addToBasket(selection.code, selection.description);
+                    }
+                });
+                console.log('Loaded selections from localStorage:', selections.length);
+                return;
+            }
+        }
+        
+        // Fallback: try to load from backend (for migration purposes)
         const response = await fetch('/bus-stop-selections');
         if (response.ok) {
             const selections = await response.json();
@@ -73,6 +89,9 @@ async function loadExistingSelections() {
                         addToBasket(selection.code, selection.description);
                     }
                 });
+                // Migrate to localStorage
+                localStorage.setItem('busStopSelections', JSON.stringify(selections));
+                console.log('Migrated selections from backend to localStorage');
             }
         }
     } catch (error) {
@@ -254,6 +273,13 @@ function removeFromBasket(code, itemElement) {
     console.log(`Removed bus stop: ${code}`);
 }
 
+// Debug function to clear localStorage (can be called from browser console)
+window.clearBusStopSelections = function() {
+    localStorage.removeItem('busStopSelections');
+    console.log('Cleared bus stop selections from localStorage');
+    location.reload();
+};
+
 async function saveSelections(saveStatus) {
     const saveButton = document.getElementById('saveChanges');
     
@@ -273,28 +299,35 @@ async function saveSelections(saveStatus) {
             };
         });
         
-        // Send to backend
-        const response = await fetch('/bus-stop-selections', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(selectionsArray)
-        });
+        // Save to localStorage (primary storage)
+        localStorage.setItem('busStopSelections', JSON.stringify(selectionsArray));
         
-        if (response.ok) {
-            saveStatus.textContent = 'Settings saved successfully!';
-            saveStatus.style.color = '#4ade80';
-            saveStatus.style.display = 'inline';
-            console.log('Bus stop selections saved successfully');
+        // Also save to backend (as backup/fallback)
+        try {
+            const response = await fetch('/bus-stop-selections', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(selectionsArray)
+            });
             
-            // Hide success message after 3 seconds
-            setTimeout(() => {
-                saveStatus.style.display = 'none';
-            }, 3000);
-        } else {
-            throw new Error('Failed to save settings');
+            if (!response.ok) {
+                console.warn('Backend save failed, but localStorage save succeeded');
+            }
+        } catch (backendError) {
+            console.warn('Backend unavailable, but localStorage save succeeded:', backendError);
         }
+        
+        saveStatus.textContent = 'Settings saved successfully!';
+        saveStatus.style.color = '#4ade80';
+        saveStatus.style.display = 'inline';
+        console.log('Bus stop selections saved to localStorage:', selectionsArray.length);
+        
+        // Hide success message after 3 seconds
+        setTimeout(() => {
+            saveStatus.style.display = 'none';
+        }, 3000);
         
     } catch (error) {
         console.error('Error saving settings:', error);

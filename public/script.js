@@ -5,13 +5,31 @@ let busStopServices = {}; // Cache for bus services at each stop
 // Load selected bus stops from settings
 async function loadSelectedBusStops() {
     try {
+        // First try to load from localStorage
+        const localSelections = localStorage.getItem('busStopSelections');
+        if (localSelections) {
+            selectedBusStops = JSON.parse(localSelections);
+            if (Array.isArray(selectedBusStops) && selectedBusStops.length > 0) {
+                console.log('Loaded selected bus stops from localStorage:', selectedBusStops);
+                return;
+            }
+        }
+        
+        // Fallback: try to load from backend (for migration purposes)
         const response = await fetch('/bus-stop-selections');
         if (response.ok) {
             selectedBusStops = await response.json();
-            console.log('Loaded selected bus stops:', selectedBusStops);
-        } else {
-            selectedBusStops = [];
+            if (Array.isArray(selectedBusStops) && selectedBusStops.length > 0) {
+                // Migrate to localStorage
+                localStorage.setItem('busStopSelections', JSON.stringify(selectedBusStops));
+                console.log('Migrated selected bus stops from backend to localStorage');
+                return;
+            }
         }
+        
+        // No selections found
+        selectedBusStops = [];
+        
     } catch (error) {
         console.error('Error loading selected bus stops:', error);
         selectedBusStops = [];
