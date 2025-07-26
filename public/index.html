@@ -3,16 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bus Arrival Times - 43471</title>
+    <title>Bus Arrival Times</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="container">
-        <h1 id="desc-43479">Bus Arrival Times for Stop 43479</h1>
-        <div id="bus-times-43479">
-            <table class="bus-table">
+        <h1>Bus Arrival Times</h1>
+        <div id="main-bus-times">
+            <table class="bus-table" id="mainTable">
                 <thead>
                     <tr>
+                        <th>Bus Stop</th>
                         <th>Bus</th>
                         <th>1st Arrival</th>
                         <th>2nd Arrival</th>
@@ -20,25 +21,13 @@
                     </tr>
                 </thead>
                 <tbody>
-                    <!-- Bus rows will be dynamically populated -->
+                    <!-- Bus rows will be dynamically populated based on settings selections -->
                 </tbody>
             </table>
         </div>
-        <h1 id="desc-43471">Bus Arrival Times for Stop 43471</h1>
-        <div id="bus-times">
-            <table class="bus-table">
-                <thead>
-                    <tr>
-                        <th>Bus</th>
-                        <th>1st Arrival</th>
-                        <th>2nd Arrival</th>
-                        <th>3rd Arrival</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <!-- Bus rows will be dynamically populated -->
-                </tbody>
-            </table>
+        
+        <div id="no-selections" class="no-selections" style="display: none;">
+            <p>No bus stops selected. Please go to <a href="settings.html">Settings</a> to select bus stops to monitor.</p>
         </div>
     </div>
     

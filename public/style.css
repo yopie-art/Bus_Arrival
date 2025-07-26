@@ -61,6 +61,53 @@ h1 {
 .bus-table td {
     background: #333333;
 }
+
+.bus-stop-cell {
+    background: #2a2a2a !important;
+    font-weight: bold;
+    vertical-align: middle;
+    text-align: left;
+    padding: 8px 12px;
+    border-right: 2px solid #555;
+    border-bottom: 2px solid #555;
+}
+
+.bus-stop-code {
+    font-size: 1.1em;
+    color: #60a5fa;
+    display: block;
+    margin-bottom: 2px;
+}
+
+.bus-stop-desc {
+    font-size: 0.85em;
+    color: #cccccc;
+    display: block;
+}
+
+.no-selections {
+    text-align: center;
+    padding: 40px 20px;
+    background: #2a2a2a;
+    border-radius: 8px;
+    border: 2px dashed #555;
+    margin: 20px 0;
+}
+
+.no-selections p {
+    margin: 0;
+    color: #888;
+    font-size: 16px;
+}
+
+.no-selections a {
+    color: #60a5fa;
+    text-decoration: none;
+}
+
+.no-selections a:hover {
+    text-decoration: underline;
+}
 .dd-icon {
     display: inline-block;
     width: 18px;
