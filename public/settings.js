@@ -65,10 +65,15 @@ function setupSearchInput(input, dropdown) {
             return;
         }
         
-        // Filter bus stops based on search query
-        const filteredStops = allBusStops.filter(stop => 
-            stop.searchText.includes(query)
-        ).slice(0, 10); // Limit to 10 results for performance
+        // Split query into individual search terms
+        const searchTerms = query.split(/\s+/).filter(term => term.length > 0);
+        
+        // Filter bus stops based on search query - all terms must match
+        const filteredStops = allBusStops.filter(stop => {
+            const searchText = stop.searchText;
+            // Check if all search terms are found in the bus stop text
+            return searchTerms.every(term => searchText.includes(term));
+        }).slice(0, 10); // Limit to 10 results for performance
         
         showDropdown(dropdown, filteredStops, input);
     });
