@@ -48,6 +48,9 @@ app.use(express.json()); // Add JSON parsing middleware
 // Serve static files from the public directory
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Serve weather images from Weather_Images directory
+app.use('/Weather_Images', express.static(path.join(__dirname, 'Weather_Images')));
+
 // In-memory storage for bus stop selections (in production, you'd use a database)
 let busStopSelections = [];
 

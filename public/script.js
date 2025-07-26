@@ -49,6 +49,10 @@ async function init() {
         setInterval(fetchBusTimes, 60000); // Update every minute
     }
     
+    // Initialize weather forecast
+    await fetchWeatherForecast();
+    setInterval(fetchWeatherForecast, 1800000); // Update every 30 minutes
+    
     setupSettingsProximity();
 }
 
@@ -279,4 +283,107 @@ function setupSettingsProximity() {
             settingsLink.classList.toggle('nearby', isNearby);
         }
     });
+}
+
+// Weather Forecast Functions
+async function fetchWeatherForecast() {
+    try {
+        const response = await fetch('https://api-open.data.gov.sg/v2/real-time/api/twenty-four-hr-forecast');
+        const data = await response.json();
+        
+        if (data.code === 0 && data.data && data.data.records && data.data.records.length > 0) {
+            const record = data.data.records[0];
+            const periods = record.periods || [];
+            
+            updateWeatherTable(periods);
+        } else {
+            console.error('Invalid weather data structure:', data);
+            showWeatherError();
+        }
+    } catch (error) {
+        console.error('Error fetching weather forecast:', error);
+        showWeatherError();
+    }
+}
+
+function updateWeatherTable(periods) {
+    const tableBody = document.querySelector('#weatherTable tbody');
+    if (!tableBody) return;
+    
+    tableBody.innerHTML = '';
+    
+    periods.forEach(period => {
+        if (!period.timePeriod || !period.regions) return;
+        
+        const row = document.createElement('tr');
+        
+        // Format time period text for better display
+        const timePeriodText = formatTimePeriod(period.timePeriod.text);
+        
+        row.innerHTML = `
+            <td class="time-period-cell">${timePeriodText}</td>
+            <td class="weather-cell">${getWeatherImage(period.regions.west?.text)}</td>
+            <td class="weather-cell">${getWeatherImage(period.regions.north?.text)}</td>
+            <td class="weather-cell">${getWeatherImage(period.regions.south?.text)}</td>
+            <td class="weather-cell">${getWeatherImage(period.regions.east?.text)}</td>
+        `;
+        
+        tableBody.appendChild(row);
+    });
+    
+    // Add last updated timestamp
+    const lastUpdated = new Date().toLocaleTimeString();
+    const timestampRow = document.createElement('tr');
+    timestampRow.className = 'weather-timestamp';
+    timestampRow.innerHTML = `
+        <td colspan="5" style="text-align: center; font-size: 0.9em; color: #666; font-style: italic;">
+            Last updated: ${lastUpdated}
+        </td>
+    `;
+    tableBody.appendChild(timestampRow);
+}
+
+function formatTimePeriod(text) {
+    // Convert API time period text to more readable format
+    // Examples: "Midday to 6 pm 26 Jul" -> "12 PM - 6 PM"
+    //          "6 pm 26 Jul to 6 am 27 Jul" -> "6 PM - 6 AM (Next Day)"
+    //          "6 am to Midday 27 Jul" -> "6 AM - 12 PM"
+    
+    if (text.includes('Midday to 6 pm')) {
+        return '12 PM - 6 PM';
+    } else if (text.includes('6 pm') && text.includes('6 am')) {
+        return '6 PM - 6 AM (+1)';
+    } else if (text.includes('6 am to Midday')) {
+        return '6 AM - 12 PM';
+    }
+    
+    // Fallback: return original text
+    return text;
+}
+
+function getWeatherImage(weatherText) {
+    if (!weatherText || weatherText === 'N/A') {
+        return '<span style="color: #666;">N/A</span>';
+    }
+    
+    // Map weather text to image filename
+    const imagePath = `Weather_Images/${weatherText}.png`;
+    
+    return `<div class="weather-icon-container">
+                <img src="${imagePath}" alt="${weatherText}" class="weather-icon" title="${weatherText}" />
+                <span class="weather-text">${weatherText}</span>
+            </div>`;
+}
+
+function showWeatherError() {
+    const tableBody = document.querySelector('#weatherTable tbody');
+    if (!tableBody) return;
+    
+    tableBody.innerHTML = `
+        <tr>
+            <td colspan="5" style="text-align: center; color: #ff6b6b; font-style: italic;">
+                Unable to load weather forecast. Please try again later.
+            </td>
+        </tr>
+    `;
 }
