@@ -1,18 +1,27 @@
-// Settings page JavaScript with searchable dropdowns
+// Settings page JavaScript with single search bar and selection basket
 let allBusStops = [];
+let selectedBusStops = new Set(); // Store selected bus stop codes to prevent duplicates
 
 document.addEventListener("DOMContentLoaded", async () => {
-    const busStop1Input = document.getElementById('busStop1');
-    const busStop2Input = document.getElementById('busStop2');
-    const dropdown1 = document.getElementById('dropdown1');
-    const dropdown2 = document.getElementById('dropdown2');
+    const searchInput = document.getElementById('busStopSearch');
+    const dropdown = document.getElementById('searchDropdown');
+    const basket = document.getElementById('selectedBasket');
+    const saveButton = document.getElementById('saveChanges');
+    const saveStatus = document.getElementById('saveStatus');
     
     // Load bus stops data
     await loadBusStops();
     
-    // Setup search functionality for both inputs
-    setupSearchInput(busStop1Input, dropdown1);
-    setupSearchInput(busStop2Input, dropdown2);
+    // Load existing selections if any
+    await loadExistingSelections();
+    
+    // Setup search functionality
+    setupSearchInput(searchInput, dropdown, basket);
+    
+    // Setup save functionality
+    saveButton.addEventListener('click', async () => {
+        await saveSelections(saveStatus);
+    });
 });
 
 async function loadBusStops() {
@@ -53,7 +62,25 @@ async function loadBusStops() {
     }
 }
 
-function setupSearchInput(input, dropdown) {
+async function loadExistingSelections() {
+    try {
+        const response = await fetch('/bus-stop-selections');
+        if (response.ok) {
+            const selections = await response.json();
+            if (Array.isArray(selections) && selections.length > 0) {
+                selections.forEach(selection => {
+                    if (selection.code && selection.description) {
+                        addToBasket(selection.code, selection.description);
+                    }
+                });
+            }
+        }
+    } catch (error) {
+        console.log('No existing selections found or error loading them');
+    }
+}
+
+function setupSearchInput(input, dropdown, basket) {
     let selectedIndex = -1;
     
     input.addEventListener('input', (e) => {
@@ -75,7 +102,7 @@ function setupSearchInput(input, dropdown) {
             return searchTerms.every(term => searchText.includes(term));
         }).slice(0, 10); // Limit to 10 results for performance
         
-        showDropdown(dropdown, filteredStops, input);
+        showDropdown(dropdown, filteredStops, input, basket);
     });
     
     input.addEventListener('keydown', (e) => {
@@ -92,7 +119,7 @@ function setupSearchInput(input, dropdown) {
         } else if (e.key === 'Enter') {
             e.preventDefault();
             if (selectedIndex >= 0 && options[selectedIndex]) {
-                selectOption(input, dropdown, options[selectedIndex]);
+                selectOption(input, dropdown, options[selectedIndex], basket);
             }
         } else if (e.key === 'Escape') {
             hideDropdown(dropdown);
@@ -105,7 +132,7 @@ function setupSearchInput(input, dropdown) {
     });
 }
 
-function showDropdown(dropdown, filteredStops, input) {
+function showDropdown(dropdown, filteredStops, input, basket) {
     dropdown.innerHTML = '';
     
     if (filteredStops.length === 0) {
@@ -117,12 +144,20 @@ function showDropdown(dropdown, filteredStops, input) {
         filteredStops.forEach(stop => {
             const option = document.createElement('div');
             option.className = 'search-option';
-            option.textContent = `${stop.BusStopCode} - ${stop.Description}`;
+            
+            // Show if already selected
+            const isSelected = selectedBusStops.has(stop.BusStopCode);
+            option.textContent = `${stop.BusStopCode} - ${stop.Description}${isSelected ? ' (already selected)' : ''}`;
             option.dataset.code = stop.BusStopCode;
             option.dataset.description = stop.Description;
             
+            if (isSelected) {
+                option.style.opacity = '0.6';
+                option.style.fontStyle = 'italic';
+            }
+            
             option.addEventListener('click', () => {
-                selectOption(input, dropdown, option);
+                selectOption(input, dropdown, option, basket);
             });
             
             dropdown.appendChild(option);
@@ -142,14 +177,133 @@ function updateSelection(options, selectedIndex) {
     });
 }
 
-function selectOption(input, dropdown, option) {
+function selectOption(input, dropdown, option, basket) {
     const code = option.dataset.code;
     const description = option.dataset.description;
     
-    input.value = `${code} - ${description}`;
-    input.dataset.selectedCode = code;
+    // Check if already selected
+    if (selectedBusStops.has(code)) {
+        console.log(`Bus stop ${code} is already selected`);
+        hideDropdown(dropdown);
+        input.value = '';
+        return;
+    }
     
+    // Add to basket
+    addToBasket(code, description);
+    
+    // Clear input and hide dropdown
+    input.value = '';
     hideDropdown(dropdown);
     
-    console.log(`Selected bus stop: ${code} - ${description}`);
+    console.log(`Added bus stop: ${code} - ${description}`);
+}
+
+function addToBasket(code, description) {
+    const basket = document.getElementById('selectedBasket');
+    
+    // Remove empty message if it exists
+    const emptyMessage = basket.querySelector('.basket-empty');
+    if (emptyMessage) {
+        emptyMessage.remove();
+    }
+    
+    // Add to selected set
+    selectedBusStops.add(code);
+    
+    // Create basket item
+    const item = document.createElement('div');
+    item.className = 'selected-item';
+    item.dataset.code = code;
+    
+    const text = document.createElement('span');
+    text.className = 'selected-item-text';
+    text.textContent = `${code} - ${description}`;
+    text.title = `${code} - ${description}`; // Tooltip for long names
+    
+    const removeBtn = document.createElement('button');
+    removeBtn.className = 'remove-item';
+    removeBtn.textContent = '×';
+    removeBtn.title = 'Remove this bus stop';
+    removeBtn.addEventListener('click', () => {
+        removeFromBasket(code, item);
+    });
+    
+    item.appendChild(text);
+    item.appendChild(removeBtn);
+    basket.appendChild(item);
+}
+
+function removeFromBasket(code, itemElement) {
+    const basket = document.getElementById('selectedBasket');
+    
+    // Remove from selected set
+    selectedBusStops.delete(code);
+    
+    // Remove DOM element
+    itemElement.remove();
+    
+    // Add empty message if no items left
+    if (selectedBusStops.size === 0) {
+        const emptyMessage = document.createElement('p');
+        emptyMessage.className = 'basket-empty';
+        emptyMessage.textContent = 'No bus stops selected. Search and click on a bus stop to add it here.';
+        basket.appendChild(emptyMessage);
+    }
+    
+    console.log(`Removed bus stop: ${code}`);
+}
+
+async function saveSelections(saveStatus) {
+    const saveButton = document.getElementById('saveChanges');
+    
+    try {
+        // Disable button during save
+        saveButton.disabled = true;
+        saveButton.textContent = 'Saving...';
+        saveStatus.style.display = 'none';
+        
+        // Prepare data to save
+        const selectionsArray = Array.from(selectedBusStops).map(code => {
+            // Find the bus stop details
+            const busStop = allBusStops.find(stop => stop.BusStopCode === code);
+            return {
+                code: code,
+                description: busStop ? busStop.Description : `Stop ${code}`
+            };
+        });
+        
+        // Send to backend
+        const response = await fetch('/bus-stop-selections', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(selectionsArray)
+        });
+        
+        if (response.ok) {
+            saveStatus.textContent = 'Settings saved successfully!';
+            saveStatus.style.color = '#4ade80';
+            saveStatus.style.display = 'inline';
+            console.log('Bus stop selections saved successfully');
+            
+            // Hide success message after 3 seconds
+            setTimeout(() => {
+                saveStatus.style.display = 'none';
+            }, 3000);
+        } else {
+            throw new Error('Failed to save settings');
+        }
+        
+    } catch (error) {
+        console.error('Error saving settings:', error);
+        saveStatus.textContent = 'Error saving settings. Please try again.';
+        saveStatus.style.color = '#ff4444';
+        saveStatus.style.display = 'inline';
+    } finally {
+        // Re-enable button
+        saveButton.disabled = false;
+        saveButton.textContent = 'Save Changes';
+    }
 }

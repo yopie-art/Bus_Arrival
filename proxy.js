@@ -44,8 +44,12 @@ const PORT = 3000;
 const path = require('path');
 const app = express();
 app.use(cors());
+app.use(express.json()); // Add JSON parsing middleware
 // Serve static files from the public directory
 app.use(express.static(path.join(__dirname, 'public')));
+
+// In-memory storage for bus stop selections (in production, you'd use a database)
+let busStopSelections = [];
 
 // API endpoint to get bus stop description(s)
 app.get('/bus-stop-description', async (req, res) => {
@@ -104,6 +108,40 @@ app.get('/bus-arrival', async (req, res) => {
     } catch (err) {
         console.error("Proxy error:", err);
         res.status(500).json({ error: 'Failed to fetch from LTA API' });
+    }
+});
+
+// API endpoint to get bus stop selections
+app.get('/bus-stop-selections', (req, res) => {
+    res.json(busStopSelections);
+});
+
+// API endpoint to save bus stop selections
+app.post('/bus-stop-selections', (req, res) => {
+    try {
+        const selections = req.body;
+        
+        // Validate that it's an array of valid selections
+        if (!Array.isArray(selections)) {
+            return res.status(400).json({ error: 'Selections must be an array' });
+        }
+        
+        // Validate each selection has required fields
+        for (const selection of selections) {
+            if (!selection.code || !selection.description) {
+                return res.status(400).json({ error: 'Each selection must have code and description' });
+            }
+        }
+        
+        // Store the selections
+        busStopSelections = selections;
+        
+        console.log(`Saved ${selections.length} bus stop selections:`, selections.map(s => s.code).join(', '));
+        res.json({ success: true, count: selections.length });
+        
+    } catch (error) {
+        console.error('Error saving bus stop selections:', error);
+        res.status(500).json({ error: 'Failed to save selections' });
     }
 });
 
