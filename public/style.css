@@ -62,8 +62,51 @@ h1 {
     background: #333333;
 }
 
+/* Alternating bus stop groups for better differentiation */
+.bus-table tr.bus-stop-group-even td {
+    background: #2a2a2a; /* Darker shade for even groups */
+}
+
+.bus-table tr.bus-stop-group-odd td {
+    background: #363636; /* Lighter shade for odd groups */
+}
+
+/* Special styling for bus stop cells to maintain their appearance */
+.bus-table tr.bus-stop-group-even .bus-stop-cell {
+    background: #242424 !important; /* Even darker for bus stop cells in even groups */
+    border-right: 2px solid #555;
+    border-bottom: 2px solid #555;
+}
+
+.bus-table tr.bus-stop-group-odd .bus-stop-cell {
+    background: #303030 !important; /* Slightly lighter for bus stop cells in odd groups */
+    border-right: 2px solid #555;
+    border-bottom: 2px solid #555;
+}
+
+/* Add a subtle separator between bus stop groups */
+.bus-table tr.bus-stop-group-even:first-of-type td {
+    border-top: 2px solid #555;
+}
+
+.bus-table tr.bus-stop-group-odd:first-of-type td {
+    border-top: 2px solid #555;
+}
+
+/* Bus stop separator row */
+.bus-stop-separator {
+    height: 3px;
+}
+
+.bus-stop-separator-cell {
+    background: #1a1a1a !important;
+    border: none !important;
+    padding: 0 !important;
+    height: 3px;
+}
+
 .bus-stop-cell {
-    background: #2a2a2a !important;
+    background: #2a2a2a !important; /* Base background, will be overridden by group classes */
     font-weight: bold;
     vertical-align: middle;
     text-align: left;
@@ -225,24 +268,49 @@ button:hover {
 }
 
 .weather-icon {
-    width: 40px;
-    height: 40px;
+    width: 56px;
+    height: 56px;
     object-fit: contain;
     border-radius: 4px;
 }
 
 .weather-text {
-    font-size: 0.75em;
-    color: #cccccc;
+    font-size: 0.7em;
+    color: #aaa;
     text-align: center;
-    line-height: 1.2;
-    max-width: 80px;
+    line-height: 1.1;
+    max-width: 90px;
     word-wrap: break-word;
+    margin-top: 2px;
 }
 
 .weather-timestamp td {
     background: #2a2a2a !important;
     border-top: 2px solid #555;
+}
+
+/* Highlighted region styles for weather table */
+.highlighted-region {
+    background: rgba(255, 255, 255, 0.08) !important; /* Subtle transparent white */
+    border: 1px solid rgba(255, 255, 255, 0.15) !important; /* Subtle white border */
+    position: relative;
+}
+
+.highlighted-region-header {
+    background: rgba(255, 255, 255, 0.12) !important; /* Slightly more prominent for header */
+    border: 1px solid rgba(255, 255, 255, 0.2) !important; /* Subtle white border */
+    color: rgba(255, 255, 255, 0.9) !important; /* Slightly brighter text */
+    font-weight: bold;
+    position: relative;
+}
+
+.highlighted-region::before {
+    content: "📍";
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    font-size: 12px;
+    opacity: 0.7;
 }
 
 @media (max-width: 600px) {
@@ -260,12 +328,18 @@ button:hover {
     }
     
     .weather-icon {
-        width: 30px;
-        height: 30px;
+        width: 42px;
+        height: 42px;
     }
     
     .weather-text {
-        font-size: 2.5vw;
-        max-width: 60px;
+        font-size: 2.2vw;
+        max-width: 70px;
+    }
+    
+    .highlighted-region::before {
+        font-size: 10px;
+        top: 1px;
+        right: 1px;
     }
 }

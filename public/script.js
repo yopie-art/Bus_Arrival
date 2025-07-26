@@ -1,6 +1,7 @@
 // Main page JavaScript for unified bus arrival display
 let selectedBusStops = [];
 let busStopServices = {}; // Cache for bus services at each stop
+let majorityRegion = null; // Store the majority region for weather highlighting
 
 // Load selected bus stops from settings
 async function loadSelectedBusStops() {
@@ -45,6 +46,7 @@ async function init() {
     } else {
         hideNoSelectionsMessage();
         await initializeTable();
+        await loadMajorityRegion(); // Load majority region for weather highlighting
         fetchBusTimes();
         setInterval(fetchBusTimes, 60000); // Update every minute
     }
@@ -101,10 +103,20 @@ function buildTableStructure() {
     
     selectedBusStops.forEach((busStop, stopIndex) => {
         const services = busStopServices[busStop.code] || [];
+        const groupClass = stopIndex % 2 === 0 ? 'bus-stop-group-even' : 'bus-stop-group-odd';
+        
+        // Add a separator row between bus stop groups (except for the first one)
+        if (stopIndex > 0) {
+            const separatorRow = document.createElement('tr');
+            separatorRow.className = 'bus-stop-separator';
+            separatorRow.innerHTML = `<td colspan="5" class="bus-stop-separator-cell"></td>`;
+            tableBody.appendChild(separatorRow);
+        }
         
         if (services.length === 0) {
             // Create a single row for bus stops with no services
             const row = document.createElement('tr');
+            row.className = groupClass;
             row.innerHTML = `
                 <td class="bus-stop-cell">
                     <span class="bus-stop-code">${busStop.code}</span>
@@ -118,6 +130,7 @@ function buildTableStructure() {
         
         services.forEach((busNo, serviceIndex) => {
             const row = document.createElement('tr');
+            row.className = groupClass;
             row.id = `row-${busStop.code}-${busNo}`;
             
             if (serviceIndex === 0) {
@@ -251,6 +264,31 @@ function getMinutesToArrival(estimatedArrival) {
     return Math.max(0, Math.round(diffMs / 60000));
 }
 
+// Load majority region for selected bus stops
+async function loadMajorityRegion() {
+    try {
+        if (selectedBusStops.length === 0) {
+            majorityRegion = null;
+            return;
+        }
+        
+        const codes = selectedBusStops.map(stop => stop.code).join(',');
+        const response = await fetch(`/majority-region?codes=${codes}`);
+        
+        if (response.ok) {
+            const data = await response.json();
+            majorityRegion = data.majorityRegion;
+            console.log(`Majority region for selected bus stops: ${majorityRegion}`);
+        } else {
+            console.error('Failed to load majority region');
+            majorityRegion = null;
+        }
+    } catch (error) {
+        console.error('Error loading majority region:', error);
+        majorityRegion = null;
+    }
+}
+
 // Initialize page when DOM is loaded
 document.addEventListener("DOMContentLoaded", () => {
     init();
@@ -295,6 +333,7 @@ async function fetchWeatherForecast() {
             const record = data.data.records[0];
             const periods = record.periods || [];
             
+            updateWeatherTableHeaders(); // Update headers with highlighting
             updateWeatherTable(periods);
         } else {
             console.error('Invalid weather data structure:', data);
@@ -304,6 +343,25 @@ async function fetchWeatherForecast() {
         console.error('Error fetching weather forecast:', error);
         showWeatherError();
     }
+}
+
+function updateWeatherTableHeaders() {
+    const tableHead = document.querySelector('#weatherTable thead tr');
+    if (!tableHead) return;
+    
+    // Determine which header to highlight based on majority region
+    const westClass = majorityRegion === 'west' ? 'highlighted-region-header' : '';
+    const northClass = majorityRegion === 'north' ? 'highlighted-region-header' : '';
+    const southClass = majorityRegion === 'south' ? 'highlighted-region-header' : '';
+    const eastClass = majorityRegion === 'east' ? 'highlighted-region-header' : '';
+    
+    tableHead.innerHTML = `
+        <th>Time Period</th>
+        <th class="${westClass}">West</th>
+        <th class="${northClass}">North</th>
+        <th class="${southClass}">South</th>
+        <th class="${eastClass}">East</th>
+    `;
 }
 
 function updateWeatherTable(periods) {
@@ -320,12 +378,18 @@ function updateWeatherTable(periods) {
         // Format time period text for better display
         const timePeriodText = formatTimePeriod(period.timePeriod.text);
         
+        // Determine which columns to highlight based on majority region
+        const westClass = majorityRegion === 'west' ? 'weather-cell highlighted-region' : 'weather-cell';
+        const northClass = majorityRegion === 'north' ? 'weather-cell highlighted-region' : 'weather-cell';
+        const southClass = majorityRegion === 'south' ? 'weather-cell highlighted-region' : 'weather-cell';
+        const eastClass = majorityRegion === 'east' ? 'weather-cell highlighted-region' : 'weather-cell';
+        
         row.innerHTML = `
             <td class="time-period-cell">${timePeriodText}</td>
-            <td class="weather-cell">${getWeatherImage(period.regions.west?.text)}</td>
-            <td class="weather-cell">${getWeatherImage(period.regions.north?.text)}</td>
-            <td class="weather-cell">${getWeatherImage(period.regions.south?.text)}</td>
-            <td class="weather-cell">${getWeatherImage(period.regions.east?.text)}</td>
+            <td class="${westClass}">${getWeatherImage(period.regions.west?.text)}</td>
+            <td class="${northClass}">${getWeatherImage(period.regions.north?.text)}</td>
+            <td class="${southClass}">${getWeatherImage(period.regions.south?.text)}</td>
+            <td class="${eastClass}">${getWeatherImage(period.regions.east?.text)}</td>
         `;
         
         tableBody.appendChild(row);
@@ -338,6 +402,7 @@ function updateWeatherTable(periods) {
     timestampRow.innerHTML = `
         <td colspan="5" style="text-align: center; font-size: 0.9em; color: #666; font-style: italic;">
             Last updated: ${lastUpdated}
+            ${majorityRegion ? ` | Highlighting ${majorityRegion.charAt(0).toUpperCase() + majorityRegion.slice(1)} region (majority of selected bus stops)` : ''}
         </td>
     `;
     tableBody.appendChild(timestampRow);

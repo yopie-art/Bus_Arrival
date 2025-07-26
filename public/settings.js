@@ -1,6 +1,8 @@
 // Settings page JavaScript with single search bar and selection basket
 let allBusStops = [];
 let selectedBusStops = new Set(); // Store selected bus stop codes to prevent duplicates
+let originalSelections = new Set(); // Store original selections to track changes
+let hasChanges = false;
 
 document.addEventListener("DOMContentLoaded", async () => {
     const searchInput = document.getElementById('busStopSearch');
@@ -71,7 +73,8 @@ async function loadExistingSelections() {
             if (Array.isArray(selections) && selections.length > 0) {
                 selections.forEach(selection => {
                     if (selection.code && selection.description) {
-                        addToBasket(selection.code, selection.description);
+                        addToBasket(selection.code, selection.description, false); // Don't trigger change detection
+                        originalSelections.add(selection.code); // Track original selections
                     }
                 });
                 console.log('Loaded selections from localStorage:', selections.length);
@@ -86,7 +89,8 @@ async function loadExistingSelections() {
             if (Array.isArray(selections) && selections.length > 0) {
                 selections.forEach(selection => {
                     if (selection.code && selection.description) {
-                        addToBasket(selection.code, selection.description);
+                        addToBasket(selection.code, selection.description, false); // Don't trigger change detection
+                        originalSelections.add(selection.code); // Track original selections
                     }
                 });
                 // Migrate to localStorage
@@ -209,7 +213,7 @@ function selectOption(input, dropdown, option, basket) {
     }
     
     // Add to basket
-    addToBasket(code, description);
+    addToBasket(code, description, true); // Enable change detection
     
     // Clear input and hide dropdown
     input.value = '';
@@ -218,7 +222,7 @@ function selectOption(input, dropdown, option, basket) {
     console.log(`Added bus stop: ${code} - ${description}`);
 }
 
-function addToBasket(code, description) {
+function addToBasket(code, description, detectChanges = true) {
     const basket = document.getElementById('selectedBasket');
     
     // Remove empty message if it exists
@@ -251,6 +255,11 @@ function addToBasket(code, description) {
     item.appendChild(text);
     item.appendChild(removeBtn);
     basket.appendChild(item);
+    
+    // Check for changes if enabled
+    if (detectChanges) {
+        checkForChanges();
+    }
 }
 
 function removeFromBasket(code, itemElement) {
@@ -271,6 +280,29 @@ function removeFromBasket(code, itemElement) {
     }
     
     console.log(`Removed bus stop: ${code}`);
+    
+    // Check for changes
+    checkForChanges();
+}
+
+// Function to check if selections have changed and update button state
+function checkForChanges() {
+    const currentSelections = new Set(selectedBusStops);
+    
+    // Check if sets are equal
+    const isEqual = currentSelections.size === originalSelections.size && 
+                    [...currentSelections].every(x => originalSelections.has(x));
+    
+    hasChanges = !isEqual;
+    
+    const saveButton = document.getElementById('saveChanges');
+    saveButton.disabled = !hasChanges;
+    
+    if (hasChanges) {
+        saveButton.textContent = 'Apply Changes';
+    } else {
+        saveButton.textContent = 'No Changes';
+    }
 }
 
 // Debug function to clear localStorage (can be called from browser console)
@@ -324,6 +356,10 @@ async function saveSelections(saveStatus) {
         saveStatus.style.display = 'inline';
         console.log('Bus stop selections saved to localStorage:', selectionsArray.length);
         
+        // Update original selections to reflect saved state
+        originalSelections = new Set(selectedBusStops);
+        checkForChanges(); // Update button state
+        
         // Hide success message after 3 seconds
         setTimeout(() => {
             saveStatus.style.display = 'none';
@@ -336,7 +372,7 @@ async function saveSelections(saveStatus) {
         saveStatus.style.display = 'inline';
     } finally {
         // Re-enable button
-        saveButton.disabled = false;
-        saveButton.textContent = 'Save Changes';
+        saveButton.disabled = !hasChanges; // Only enable if there are changes
+        saveButton.textContent = hasChanges ? 'Apply Changes' : 'No Changes';
     }
 }

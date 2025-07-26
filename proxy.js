@@ -7,7 +7,27 @@ let cachedBusStops = null;
 let cachedBusStopsTime = 0;
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
+// Load bus stops with region data from local file if available
+let localBusStops = null;
+try {
+    const fs = require('fs');
+    const path = require('path');
+    const busStopsPath = path.join(__dirname, 'bus_stops.json');
+    if (fs.existsSync(busStopsPath)) {
+        localBusStops = JSON.parse(fs.readFileSync(busStopsPath, 'utf8'));
+        console.log(`Loaded ${localBusStops.length} bus stops with region data from local file`);
+    }
+} catch (error) {
+    console.log('Local bus stops file not found, will use API');
+}
+
 async function fetchAllBusStops() {
+    // Use local data if available
+    if (localBusStops) {
+        return localBusStops;
+    }
+    
+    // Fallback to API cache
     const now = Date.now();
     if (cachedBusStops && (now - cachedBusStopsTime < ONE_DAY_MS)) {
         return cachedBusStops;
@@ -32,6 +52,34 @@ async function fetchAllBusStops() {
     cachedBusStops = allStops;
     cachedBusStopsTime = now;
     return allStops;
+}
+
+// Function to determine majority region from selected bus stops
+function getMajorityRegion(busStopCodes) {
+    if (!localBusStops || !Array.isArray(busStopCodes) || busStopCodes.length === 0) {
+        return null;
+    }
+    
+    const regionCounts = {};
+    
+    busStopCodes.forEach(code => {
+        const busStop = localBusStops.find(stop => stop.BusStopCode === code);
+        if (busStop && busStop.Region) {
+            regionCounts[busStop.Region] = (regionCounts[busStop.Region] || 0) + 1;
+        }
+    });
+    
+    // Find the region with the most bus stops
+    let majorityRegion = null;
+    let maxCount = 0;
+    for (const [region, count] of Object.entries(regionCounts)) {
+        if (count > maxCount) {
+            maxCount = count;
+            majorityRegion = region;
+        }
+    }
+    
+    return majorityRegion;
 }
 // Simple Node.js Express proxy for LTA DataMall Bus Arrival API
 const express = require('express');
@@ -145,6 +193,28 @@ app.post('/bus-stop-selections', (req, res) => {
     } catch (error) {
         console.error('Error saving bus stop selections:', error);
         res.status(500).json({ error: 'Failed to save selections' });
+    }
+});
+
+// API endpoint to get majority region for selected bus stops
+app.get('/majority-region', (req, res) => {
+    try {
+        const busStopCodes = req.query.codes;
+        if (!busStopCodes) {
+            return res.status(400).json({ error: 'codes query parameter is required' });
+        }
+        
+        const codes = Array.isArray(busStopCodes) ? busStopCodes : busStopCodes.split(',');
+        const majorityRegion = getMajorityRegion(codes);
+        
+        res.json({ 
+            majorityRegion: majorityRegion,
+            totalStops: codes.length 
+        });
+        
+    } catch (error) {
+        console.error('Error determining majority region:', error);
+        res.status(500).json({ error: 'Failed to determine majority region' });
     }
 });
 
