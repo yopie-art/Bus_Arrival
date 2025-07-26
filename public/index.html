@@ -8,7 +8,12 @@
 </head>
 <body>
     <div class="container">
-        <h1>Bus Arrival Times</h1>
+        <div class="main-header">
+            <h1>Bus Arrival Times</h1>
+            <div class="header-weather" id="headerWeather">
+                <!-- Weather icons will be dynamically populated -->
+            </div>
+        </div>
         <div id="main-bus-times">
             <table class="bus-table" id="mainTable">
                 <thead>
@@ -32,21 +37,28 @@
         
         <!-- Weather Forecast Section -->
         <div id="weather-forecast" class="weather-section">
-            <h2>24-Hour Weather Forecast</h2>
-            <table class="weather-table" id="weatherTable">
-                <thead>
-                    <tr>
-                        <th>Time Period</th>
-                        <th>West</th>
-                        <th>North</th>
-                        <th>South</th>
-                        <th>East</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <!-- Weather rows will be dynamically populated -->
-                </tbody>
-            </table>
+            <div class="weather-header" id="weatherHeader">
+                <h2>Regional Weather</h2>
+                <button class="weather-toggle" id="weatherToggle">
+                    <span class="toggle-icon">▼</span>
+                </button>
+            </div>
+            <div class="weather-content" id="weatherContent">
+                <table class="weather-table" id="weatherTable">
+                    <thead>
+                        <tr>
+                            <th>Time Period</th>
+                            <th>West</th>
+                            <th>North</th>
+                            <th>South</th>
+                            <th>East</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Weather rows will be dynamically populated -->
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
     

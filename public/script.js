@@ -55,6 +55,9 @@ async function init() {
     await fetchWeatherForecast();
     setInterval(fetchWeatherForecast, 1800000); // Update every 30 minutes
     
+    // Setup collapsible weather
+    setupWeatherToggle();
+    
     setupSettingsProximity();
 }
 
@@ -269,6 +272,8 @@ async function loadMajorityRegion() {
     try {
         if (selectedBusStops.length === 0) {
             majorityRegion = null;
+            // Update header weather when no region is selected
+            updateHeaderWeather([]);
             return;
         }
         
@@ -279,6 +284,9 @@ async function loadMajorityRegion() {
             const data = await response.json();
             majorityRegion = data.majorityRegion;
             console.log(`Majority region for selected bus stops: ${majorityRegion}`);
+            
+            // Trigger weather update to refresh header weather
+            fetchWeatherForecast();
         } else {
             console.error('Failed to load majority region');
             majorityRegion = null;
@@ -335,6 +343,7 @@ async function fetchWeatherForecast() {
             
             updateWeatherTableHeaders(); // Update headers with highlighting
             updateWeatherTable(periods);
+            updateHeaderWeather(periods); // Update header weather icons
         } else {
             console.error('Invalid weather data structure:', data);
             showWeatherError();
@@ -451,4 +460,81 @@ function showWeatherError() {
             </td>
         </tr>
     `;
+}
+
+// Setup collapsible weather functionality
+function setupWeatherToggle() {
+    const weatherHeader = document.getElementById('weatherHeader');
+    const weatherToggle = document.getElementById('weatherToggle');
+    const weatherContent = document.getElementById('weatherContent');
+    
+    if (!weatherHeader || !weatherToggle || !weatherContent) return;
+    
+    weatherHeader.addEventListener('click', () => {
+        const isCollapsed = weatherContent.classList.contains('hidden');
+        
+        if (isCollapsed) {
+            // Expand
+            weatherContent.classList.remove('hidden');
+            weatherToggle.classList.remove('collapsed');
+        } else {
+            // Collapse
+            weatherContent.classList.add('hidden');
+            weatherToggle.classList.add('collapsed');
+        }
+    });
+}
+
+// Update header weather icons for majority region
+function updateHeaderWeather(periods) {
+    const headerWeather = document.getElementById('headerWeather');
+    if (!headerWeather) return;
+    
+    if (!majorityRegion) {
+        // Show a message when no bus stops are selected
+        headerWeather.innerHTML = `
+            <div style="color: #888; font-size: 0.9em; text-align: center; padding: 10px;">
+                Select bus stops to see regional weather
+            </div>
+        `;
+        return;
+    }
+    
+    headerWeather.innerHTML = '';
+    
+    periods.forEach(period => {
+        if (!period.timePeriod || !period.regions) return;
+        
+        const regionWeather = period.regions[majorityRegion];
+        if (!regionWeather) return;
+        
+        const timePeriodText = formatTimePeriodShort(period.timePeriod.text);
+        
+        const weatherItem = document.createElement('div');
+        weatherItem.className = 'header-weather-item';
+        
+        weatherItem.innerHTML = `
+            <div class="header-weather-period">${timePeriodText}</div>
+            <div class="header-weather-icon-container">
+                <img src="Weather_Images/${regionWeather.text}.png" alt="${regionWeather.text}" class="header-weather-icon" />
+                <div class="header-weather-text">${regionWeather.text}</div>
+            </div>
+        `;
+        
+        headerWeather.appendChild(weatherItem);
+    });
+}
+
+// Format time period for header display (shorter version)
+function formatTimePeriodShort(text) {
+    if (text.includes('Midday to 6 pm')) {
+        return '12-6PM';
+    } else if (text.includes('6 pm') && text.includes('6 am')) {
+        return '6PM-6AM';
+    } else if (text.includes('6 am to Midday')) {
+        return '6AM-12PM';
+    }
+    
+    // Fallback: return first few words
+    return text.split(' ').slice(0, 2).join(' ');
 }

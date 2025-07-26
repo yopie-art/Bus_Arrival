@@ -105,6 +105,7 @@ async function loadExistingSelections() {
 
 function setupSearchInput(input, dropdown, basket) {
     let selectedIndex = -1;
+    let isSelecting = false; // Flag to prevent blur interference
     
     input.addEventListener('input', (e) => {
         const query = e.target.value.toLowerCase().trim();
@@ -125,7 +126,7 @@ function setupSearchInput(input, dropdown, basket) {
             return searchTerms.every(term => searchText.includes(term));
         }).slice(0, 10); // Limit to 10 results for performance
         
-        showDropdown(dropdown, filteredStops, input, basket);
+        showDropdown(dropdown, filteredStops, input, basket, () => { isSelecting = true; });
     });
     
     input.addEventListener('keydown', (e) => {
@@ -142,7 +143,9 @@ function setupSearchInput(input, dropdown, basket) {
         } else if (e.key === 'Enter') {
             e.preventDefault();
             if (selectedIndex >= 0 && options[selectedIndex]) {
+                isSelecting = true;
                 selectOption(input, dropdown, options[selectedIndex], basket);
+                isSelecting = false;
             }
         } else if (e.key === 'Escape') {
             hideDropdown(dropdown);
@@ -150,12 +153,18 @@ function setupSearchInput(input, dropdown, basket) {
     });
     
     input.addEventListener('blur', () => {
-        // Delay hiding to allow click events on dropdown
-        setTimeout(() => hideDropdown(dropdown), 200);
+        // Only hide dropdown if we're not in the middle of selecting
+        if (!isSelecting) {
+            setTimeout(() => {
+                if (!isSelecting) {
+                    hideDropdown(dropdown);
+                }
+            }, 300);
+        }
     });
 }
 
-function showDropdown(dropdown, filteredStops, input, basket) {
+function showDropdown(dropdown, filteredStops, input, basket, setSelectingCallback) {
     dropdown.innerHTML = '';
     
     if (filteredStops.length === 0) {
@@ -174,12 +183,24 @@ function showDropdown(dropdown, filteredStops, input, basket) {
             option.dataset.code = stop.BusStopCode;
             option.dataset.description = stop.Description;
             
+            console.log('Created option:', { code: option.dataset.code, description: option.dataset.description, stopCode: stop.BusStopCode, stopDesc: stop.Description });
+            
             if (isSelected) {
                 option.style.opacity = '0.6';
                 option.style.fontStyle = 'italic';
             }
             
-            option.addEventListener('click', () => {
+            option.addEventListener('mousedown', (e) => {
+                e.preventDefault(); // Prevent blur from happening
+                if (setSelectingCallback) setSelectingCallback();
+                console.log('Option mousedown:', option.dataset.code, option.dataset.description);
+                selectOption(input, dropdown, option, basket);
+            });
+            
+            option.addEventListener('click', (e) => {
+                e.preventDefault(); // Prevent any default behavior
+                if (setSelectingCallback) setSelectingCallback();
+                console.log('Option clicked:', option.dataset.code, option.dataset.description);
                 selectOption(input, dropdown, option, basket);
             });
             
@@ -204,6 +225,13 @@ function selectOption(input, dropdown, option, basket) {
     const code = option.dataset.code;
     const description = option.dataset.description;
     
+    console.log('selectOption called with:', { code, description, option, hasCode: !!code, hasDescription: !!description });
+    
+    if (!code || !description) {
+        console.error('Missing code or description:', { code, description });
+        return;
+    }
+    
     // Check if already selected
     if (selectedBusStops.has(code)) {
         console.log(`Bus stop ${code} is already selected`);
@@ -220,6 +248,9 @@ function selectOption(input, dropdown, option, basket) {
     hideDropdown(dropdown);
     
     console.log(`Added bus stop: ${code} - ${description}`);
+    
+    // Re-focus the input for continued searching
+    setTimeout(() => input.focus(), 50);
 }
 
 function addToBasket(code, description, detectChanges = true) {
