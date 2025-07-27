@@ -106,7 +106,6 @@ function buildTableStructure() {
     
     selectedBusStops.forEach((busStop, stopIndex) => {
         const services = busStopServices[busStop.code] || [];
-        const groupClass = stopIndex % 2 === 0 ? 'bus-stop-group-even' : 'bus-stop-group-odd';
         
         // Add a separator row between bus stop groups (except for the first one)
         if (stopIndex > 0) {
@@ -119,7 +118,6 @@ function buildTableStructure() {
         if (services.length === 0) {
             // Create a single row for bus stops with no services
             const row = document.createElement('tr');
-            row.className = groupClass;
             row.innerHTML = `
                 <td class="bus-stop-cell">
                     <span class="bus-stop-code">${busStop.code}</span>
@@ -133,7 +131,6 @@ function buildTableStructure() {
         
         services.forEach((busNo, serviceIndex) => {
             const row = document.createElement('tr');
-            row.className = groupClass;
             row.id = `row-${busStop.code}-${busNo}`;
             
             if (serviceIndex === 0) {
@@ -392,7 +389,7 @@ function updateFourDayWeatherTable(forecasts) {
     forecasts.forEach(forecast => {
         const summary = forecast.forecast?.summary || 'N/A';
         summaryRow.innerHTML += `<td class="weather-cell">
-            <div style="font-size: 0.85em; text-align: center; color: #cccccc; line-height: 1.2;">
+            <div style="font-size: 1.1em; text-align: center; color: #ffffff; line-height: 1.3; font-weight: 500; word-wrap: break-word; white-space: normal; padding: 4px 2px;">
                 ${summary}
             </div>
         </td>`;
