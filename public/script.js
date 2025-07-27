@@ -54,10 +54,10 @@ async function init() {
     // Initialize weather forecast
     await fetchWeatherForecast();
     setInterval(fetchWeatherForecast, 1800000); // Update every 30 minutes
-    
-    // Setup collapsible weather
-    setupWeatherToggle();
-    
+
+    // Setup collapsible weather (collapsed by default)
+    setupWeatherToggle(true);
+
     setupSettingsProximity();
 }
 
@@ -334,18 +334,30 @@ function setupSettingsProximity() {
 // Weather Forecast Functions
 async function fetchWeatherForecast() {
     try {
-        const response = await fetch('https://api-open.data.gov.sg/v2/real-time/api/twenty-four-hr-forecast');
-        const data = await response.json();
+        // Fetch both 24-hour regional forecast (for header) and 4-day outlook (for table)
+        const [regionalResponse, fourDayResponse] = await Promise.all([
+            fetch('https://api-open.data.gov.sg/v2/real-time/api/twenty-four-hr-forecast'),
+            fetch('https://api-open.data.gov.sg/v2/real-time/api/four-day-outlook')
+        ]);
         
-        if (data.code === 0 && data.data && data.data.records && data.data.records.length > 0) {
-            const record = data.data.records[0];
+        const regionalData = await regionalResponse.json();
+        const fourDayData = await fourDayResponse.json();
+        
+        // Handle regional data for header weather icons
+        if (regionalData.code === 0 && regionalData.data && regionalData.data.records && regionalData.data.records.length > 0) {
+            const record = regionalData.data.records[0];
             const periods = record.periods || [];
-            
-            updateWeatherTableHeaders(); // Update headers with highlighting
-            updateWeatherTable(periods);
             updateHeaderWeather(periods); // Update header weather icons
+        }
+        
+        // Handle 4-day outlook data for the main weather table
+        if (fourDayData.code === 0 && fourDayData.data && fourDayData.data.records && fourDayData.data.records.length > 0) {
+            const record = fourDayData.data.records[0];
+            const forecasts = record.forecasts || [];
+            
+            updateFourDayWeatherTable(forecasts);
         } else {
-            console.error('Invalid weather data structure:', data);
+            console.error('Invalid 4-day weather data structure:', fourDayData);
             showWeatherError();
         }
     } catch (error) {
@@ -354,85 +366,87 @@ async function fetchWeatherForecast() {
     }
 }
 
-function updateWeatherTableHeaders() {
+function updateFourDayWeatherTable(forecasts) {
     const tableHead = document.querySelector('#weatherTable thead tr');
-    if (!tableHead) return;
-    
-    // Determine which header to highlight based on majority region
-    const westClass = majorityRegion === 'west' ? 'highlighted-region-header' : '';
-    const northClass = majorityRegion === 'north' ? 'highlighted-region-header' : '';
-    const southClass = majorityRegion === 'south' ? 'highlighted-region-header' : '';
-    const eastClass = majorityRegion === 'east' ? 'highlighted-region-header' : '';
-    
-    tableHead.innerHTML = `
-        <th>Time Period</th>
-        <th class="${westClass}">West</th>
-        <th class="${northClass}">North</th>
-        <th class="${southClass}">South</th>
-        <th class="${eastClass}">East</th>
-    `;
-}
-
-function updateWeatherTable(periods) {
     const tableBody = document.querySelector('#weatherTable tbody');
-    if (!tableBody) return;
+    if (!tableHead || !tableBody) return;
     
+    // Update table headers with days
+    let headerHTML = '<th>📊</th>'; // Metrics icon for the first column
+    forecasts.forEach(forecast => {
+        if (forecast.day && forecast.timestamp) {
+            const date = new Date(forecast.timestamp);
+            const dayName = forecast.day.slice(0, 3); // Mon, Tue, etc.
+            const dayMonth = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            headerHTML += `<th>${dayName}<br><small>${dayMonth}</small></th>`;
+        }
+    });
+    tableHead.innerHTML = headerHTML;
+    
+    // Clear existing body content
     tableBody.innerHTML = '';
     
-    periods.forEach(period => {
-        if (!period.timePeriod || !period.regions) return;
-        
-        const row = document.createElement('tr');
-        
-        // Format time period text for better display
-        const timePeriodText = formatTimePeriod(period.timePeriod.text);
-        
-        // Determine which columns to highlight based on majority region
-        const westClass = majorityRegion === 'west' ? 'weather-cell highlighted-region' : 'weather-cell';
-        const northClass = majorityRegion === 'north' ? 'weather-cell highlighted-region' : 'weather-cell';
-        const southClass = majorityRegion === 'south' ? 'weather-cell highlighted-region' : 'weather-cell';
-        const eastClass = majorityRegion === 'east' ? 'weather-cell highlighted-region' : 'weather-cell';
-        
-        row.innerHTML = `
-            <td class="time-period-cell">${timePeriodText}</td>
-            <td class="${westClass}">${getWeatherImage(period.regions.west?.text)}</td>
-            <td class="${northClass}">${getWeatherImage(period.regions.north?.text)}</td>
-            <td class="${southClass}">${getWeatherImage(period.regions.south?.text)}</td>
-            <td class="${eastClass}">${getWeatherImage(period.regions.east?.text)}</td>
-        `;
-        
-        tableBody.appendChild(row);
+    // Weather Summary Row
+    const summaryRow = document.createElement('tr');
+    summaryRow.innerHTML = '<td class="time-period-cell">☁️ Weather</td>';
+    forecasts.forEach(forecast => {
+        const summary = forecast.forecast?.text || forecast.forecast?.summary || 'N/A';
+        summaryRow.innerHTML += `<td class="weather-cell">${getWeatherImageForFourDay(summary)}</td>`;
     });
+    tableBody.appendChild(summaryRow);
+    
+    // Temperature Row
+    const tempRow = document.createElement('tr');
+    tempRow.innerHTML = '<td class="time-period-cell">🌡️ Temperature</td>';
+    forecasts.forEach(forecast => {
+        const tempLow = forecast.temperature?.low || '-';
+        const tempHigh = forecast.temperature?.high || '-';
+        tempRow.innerHTML += `<td class="weather-cell">
+            <div style="font-weight: bold; color: #ff6b6b;">${tempHigh}°C</div>
+            <div style="font-size: 0.8em; color: #60a5fa;">${tempLow}°C</div>
+            <div style="font-size: 0.7em; color: #888;">High / Low</div>
+        </td>`;
+    });
+    tableBody.appendChild(tempRow);
+    
+    // Humidity Row
+    const humidityRow = document.createElement('tr');
+    humidityRow.innerHTML = '<td class="time-period-cell">💧 Humidity</td>';
+    forecasts.forEach(forecast => {
+        const humidityLow = forecast.relativeHumidity?.low || '-';
+        const humidityHigh = forecast.relativeHumidity?.high || '-';
+        humidityRow.innerHTML += `<td class="weather-cell">
+            <div style="font-weight: bold;">${humidityHigh}%</div>
+            <div style="font-size: 0.8em; color: #888;">${humidityLow}%</div>
+            <div style="font-size: 0.7em; color: #888;">High / Low</div>
+        </td>`;
+    });
+    tableBody.appendChild(humidityRow);
     
     // Add last updated timestamp
     const lastUpdated = new Date().toLocaleTimeString();
     const timestampRow = document.createElement('tr');
     timestampRow.className = 'weather-timestamp';
     timestampRow.innerHTML = `
-        <td colspan="5" style="text-align: center; font-size: 0.9em; color: #666; font-style: italic;">
-            Last updated: ${lastUpdated}
-            ${majorityRegion ? ` | Highlighting ${majorityRegion.charAt(0).toUpperCase() + majorityRegion.slice(1)} region (majority of selected bus stops)` : ''}
+        <td colspan="${forecasts.length + 1}" style="text-align: center; font-size: 0.9em; color: #666; font-style: italic;">
+            4-Day Weather Outlook | Last updated: ${lastUpdated}
         </td>
     `;
     tableBody.appendChild(timestampRow);
 }
 
-function formatTimePeriod(text) {
-    // Convert API time period text to more readable format
-    // Examples: "Midday to 6 pm 26 Jul" -> "12 PM - 6 PM"
-    //          "6 pm 26 Jul to 6 am 27 Jul" -> "6 PM - 6 AM (Next Day)"
-    //          "6 am to Midday 27 Jul" -> "6 AM - 12 PM"
-    
-    if (text.includes('Midday to 6 pm')) {
-        return '12 PM - 6 PM';
-    } else if (text.includes('6 pm') && text.includes('6 am')) {
-        return '6 PM - 6 AM (+1)';
-    } else if (text.includes('6 am to Midday')) {
-        return '6 AM - 12 PM';
+function getWeatherImageForFourDay(weatherText) {
+    if (!weatherText || weatherText === 'N/A') {
+        return '<span style="color: #666;">N/A</span>';
     }
     
-    // Fallback: return original text
-    return text;
+    // Map weather text to image filename
+    const imagePath = `Weather_Images/${weatherText}.png`;
+    
+    return `<div class="weather-icon-container">
+                <img src="${imagePath}" alt="${weatherText}" class="weather-icon" title="${weatherText}" />
+                <span class="weather-text">${weatherText}</span>
+            </div>`;
 }
 
 function getWeatherImage(weatherText) {
@@ -456,29 +470,34 @@ function showWeatherError() {
     tableBody.innerHTML = `
         <tr>
             <td colspan="5" style="text-align: center; color: #ff6b6b; font-style: italic;">
-                Unable to load weather forecast. Please try again later.
+                Unable to load 4-day weather forecast. Please try again later.
             </td>
         </tr>
     `;
 }
 
 // Setup collapsible weather functionality
-function setupWeatherToggle() {
+function setupWeatherToggle(startCollapsed = false) {
     const weatherHeader = document.getElementById('weatherHeader');
     const weatherToggle = document.getElementById('weatherToggle');
     const weatherContent = document.getElementById('weatherContent');
-    
+
     if (!weatherHeader || !weatherToggle || !weatherContent) return;
-    
-    weatherHeader.addEventListener('click', () => {
+
+    // Collapse by default if requested
+    if (startCollapsed) {
+        weatherContent.classList.add('hidden');
+        weatherToggle.classList.add('collapsed');
+    }
+
+    // Only toggle when clicking the button, not the whole header
+    weatherToggle.addEventListener('click', (e) => {
+        e.stopPropagation();
         const isCollapsed = weatherContent.classList.contains('hidden');
-        
         if (isCollapsed) {
-            // Expand
             weatherContent.classList.remove('hidden');
             weatherToggle.classList.remove('collapsed');
         } else {
-            // Collapse
             weatherContent.classList.add('hidden');
             weatherToggle.classList.add('collapsed');
         }
