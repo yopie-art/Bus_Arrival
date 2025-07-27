@@ -372,7 +372,7 @@ function updateFourDayWeatherTable(forecasts) {
     if (!tableHead || !tableBody) return;
     
     // Update table headers with days
-    let headerHTML = '<th>📊</th>'; // Metrics icon for the first column
+    let headerHTML = '<th></th>'; // Empty first column header
     forecasts.forEach(forecast => {
         if (forecast.day && forecast.timestamp) {
             const date = new Date(forecast.timestamp);
@@ -386,24 +386,37 @@ function updateFourDayWeatherTable(forecasts) {
     // Clear existing body content
     tableBody.innerHTML = '';
     
-    // Weather Summary Row
+    // Summary Row (new)
     const summaryRow = document.createElement('tr');
-    summaryRow.innerHTML = '<td class="time-period-cell">☁️ Weather</td>';
+    summaryRow.innerHTML = '<td class="time-period-cell">Summary</td>';
     forecasts.forEach(forecast => {
-        const summary = forecast.forecast?.text || forecast.forecast?.summary || 'N/A';
-        summaryRow.innerHTML += `<td class="weather-cell">${getWeatherImageForFourDay(summary)}</td>`;
+        const summary = forecast.forecast?.summary || 'N/A';
+        summaryRow.innerHTML += `<td class="weather-cell">
+            <div style="font-size: 0.85em; text-align: center; color: #cccccc; line-height: 1.2;">
+                ${summary}
+            </div>
+        </td>`;
     });
     tableBody.appendChild(summaryRow);
     
+    // Weather Row
+    const weatherRow = document.createElement('tr');
+    weatherRow.innerHTML = '<td class="time-period-cell">Weather</td>';
+    forecasts.forEach(forecast => {
+        const weatherText = forecast.forecast?.text || 'N/A';
+        weatherRow.innerHTML += `<td class="weather-cell">${getWeatherImageForFourDay(weatherText)}</td>`;
+    });
+    tableBody.appendChild(weatherRow);
+    
     // Temperature Row
     const tempRow = document.createElement('tr');
-    tempRow.innerHTML = '<td class="time-period-cell">🌡️ Temperature</td>';
+    tempRow.innerHTML = '<td class="time-period-cell">Temperature</td>';
     forecasts.forEach(forecast => {
         const tempLow = forecast.temperature?.low || '-';
         const tempHigh = forecast.temperature?.high || '-';
         tempRow.innerHTML += `<td class="weather-cell">
-            <div style="font-weight: bold; color: #ff6b6b;">${tempHigh}°C</div>
-            <div style="font-size: 0.8em; color: #60a5fa;">${tempLow}°C</div>
+            <div style="font-weight: bold; color: #ff6b6b; font-size: 0.9em;">${tempHigh}°C</div>
+            <div style="font-weight: bold; color: #60a5fa; font-size: 0.9em;">${tempLow}°C</div>
             <div style="font-size: 0.7em; color: #888;">High / Low</div>
         </td>`;
     });
@@ -411,7 +424,7 @@ function updateFourDayWeatherTable(forecasts) {
     
     // Humidity Row
     const humidityRow = document.createElement('tr');
-    humidityRow.innerHTML = '<td class="time-period-cell">💧 Humidity</td>';
+    humidityRow.innerHTML = '<td class="time-period-cell">Humidity</td>';
     forecasts.forEach(forecast => {
         const humidityLow = forecast.relativeHumidity?.low || '-';
         const humidityHigh = forecast.relativeHumidity?.high || '-';
@@ -440,11 +453,11 @@ function getWeatherImageForFourDay(weatherText) {
         return '<span style="color: #666;">N/A</span>';
     }
     
-    // Map weather text to image filename
-    const imagePath = `Weather_Images/${weatherText}.png`;
+    // Map weather text to image filename - for 4-day forecast we use the main weather directory
+    const imagePath = `../Weather_Images/${weatherText}.png`;
     
     return `<div class="weather-icon-container">
-                <img src="${imagePath}" alt="${weatherText}" class="weather-icon" title="${weatherText}" />
+                <img src="${imagePath}" alt="${weatherText}" class="weather-icon" title="${weatherText}" onerror="this.style.display='none'; this.nextElementSibling.style.color='#ff6b6b';" />
                 <span class="weather-text">${weatherText}</span>
             </div>`;
 }
