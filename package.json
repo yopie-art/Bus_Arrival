@@ -7,7 +7,9 @@
   },
   "dependencies": {
     "cors": "^2.8.5",
+    "dotenv": "^17.2.1",
     "express": "^5.1.0",
+    "ical": "^0.8.0",
     "node-fetch": "^3.3.2"
   }
 }

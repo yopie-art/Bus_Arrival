@@ -85,6 +85,8 @@ function getMajorityRegion(busStopCodes) {
 const express = require('express');
 const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
 const cors = require('cors');
+const ical = require('ical');
+require('dotenv').config();
 
 // API_KEY is already declared above
 const PORT = 3000;
@@ -217,6 +219,150 @@ app.get('/majority-region', (req, res) => {
         res.status(500).json({ error: 'Failed to determine majority region' });
     }
 });
+
+// Calendar API endpoint
+app.get('/api/calendar', async (req, res) => {
+    try {
+        const icalUrl = process.env.CALENDAR_ICAL_URL;
+        
+        if (!icalUrl) {
+            return res.status(500).json({
+                success: false,
+                error: 'Calendar URL not configured'
+            });
+        }
+        
+        // Fetch calendar data
+        const response = await fetch(icalUrl);
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        
+        const icalData = await response.text();
+        
+        // Parse iCal data
+        const events = ical.parseICS(icalData);
+        
+        // Filter and format upcoming events
+        const upcomingEvents = formatCalendarEvents(events);
+        
+        res.json({
+            success: true,
+            events: upcomingEvents,
+            lastUpdated: new Date().toISOString()
+        });
+        
+    } catch (error) {
+        console.error('Calendar fetch error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to fetch calendar data'
+        });
+    }
+});
+
+// Today's calendar snippet API endpoint
+app.get('/api/calendar/today', async (req, res) => {
+    try {
+        const icalUrl = process.env.CALENDAR_ICAL_URL;
+        
+        if (!icalUrl) {
+            return res.status(500).json({
+                success: false,
+                error: 'Calendar URL not configured'
+            });
+        }
+        
+        // Fetch calendar data
+        const response = await fetch(icalUrl);
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        
+        const icalData = await response.text();
+        
+        // Parse iCal data
+        const events = ical.parseICS(icalData);
+        
+        // Filter for today's events only
+        const todayEvents = formatTodayEvents(events);
+        
+        res.json({
+            success: true,
+            events: todayEvents,
+            lastUpdated: new Date().toISOString()
+        });
+        
+    } catch (error) {
+        console.error('Today calendar fetch error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to fetch today calendar data'
+        });
+    }
+});
+
+function formatCalendarEvents(events) {
+    const now = new Date();
+    const weekFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+    
+    const upcomingEvents = [];
+    
+    for (let key in events) {
+        const event = events[key];
+        
+        if (event.type === 'VEVENT' && event.start) {
+            const eventStart = new Date(event.start);
+            
+            // Only include events in the next 7 days
+            if (eventStart >= now && eventStart <= weekFromNow) {
+                upcomingEvents.push({
+                    summary: event.summary || 'Untitled Event',
+                    start: eventStart.toISOString(),
+                    end: event.end ? new Date(event.end).toISOString() : null,
+                    description: event.description || '',
+                    location: event.location || ''
+                });
+            }
+        }
+    }
+    
+    // Sort by start time and limit to 10 events
+    return upcomingEvents
+        .sort((a, b) => new Date(a.start) - new Date(b.start))
+        .slice(0, 10);
+}
+
+function formatTodayEvents(events) {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const tomorrow = new Date(today.getTime() + 24 * 60 * 60 * 1000);
+    
+    const todayEvents = [];
+    
+    for (let key in events) {
+        const event = events[key];
+        
+        if (event.type === 'VEVENT' && event.start) {
+            const eventStart = new Date(event.start);
+            const eventDate = new Date(eventStart.getFullYear(), eventStart.getMonth(), eventStart.getDate());
+            
+            // Only include events happening today
+            if (eventDate.getTime() === today.getTime() && eventStart >= now) {
+                todayEvents.push({
+                    summary: event.summary || 'Untitled Event',
+                    start: eventStart.toISOString(),
+                    end: event.end ? new Date(event.end).toISOString() : null
+                });
+            }
+        }
+    }
+    
+    // Sort by start time and limit to 3 events for snippet
+    return todayEvents
+        .sort((a, b) => new Date(a.start) - new Date(b.start))
+        .slice(0, 3);
+}
 
 app.listen(PORT, () => {
     console.log(`Proxy server running at http://localhost:${PORT}`);

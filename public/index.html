@@ -14,6 +14,12 @@
                 <!-- Weather icons will be dynamically populated -->
             </div>
         </div>
+        
+        <!-- Today's Calendar Snippet -->
+        <div id="today-calendar-snippet" class="today-calendar-snippet">
+            <!-- Today's events will be dynamically populated -->
+        </div>
+        
         <div id="main-bus-times">
             <table class="bus-table" id="mainTable">
                 <thead>
@@ -58,6 +64,21 @@
                         <!-- Weather rows will be dynamically populated -->
                     </tbody>
                 </table>
+            </div>
+        </div>
+        
+        <!-- Calendar Section -->
+        <div id="calendar-section" class="calendar-section">
+            <div class="calendar-header" id="calendarHeader">
+                <h2>Full Calendar</h2>
+                <button class="calendar-toggle" id="calendarToggle">
+                    <span class="toggle-icon">▼</span>
+                </button>
+            </div>
+            <div class="calendar-content" id="calendarContent">
+                <div id="calendarEventsContainer" class="calendar-events-container">
+                    <div class="calendar-loading">Loading calendar events...</div>
+                </div>
             </div>
         </div>
     </div>

@@ -59,6 +59,27 @@ body {
         font-size: 2vw;
         max-width: 45px;
     }
+    
+    /* Mobile: Move today's calendar snippet after weather */
+    .today-calendar-snippet {
+        order: 1;
+        margin-top: 10px;
+        margin-bottom: 15px;
+        padding: 3vw;
+    }
+    
+    .today-snippet-time {
+        min-width: 50px;
+        font-size: 2.6vw;
+    }
+    
+    .today-snippet-title {
+        font-size: 2.8vw;
+    }
+    
+    #main-bus-times {
+        order: 2;
+    }
 }
 /* Main header with weather icons */
 .main-header {
@@ -72,6 +93,48 @@ body {
 .main-header h1 {
     margin: 0;
     text-align: left;
+}
+
+/* Today's Calendar Snippet */
+.today-calendar-snippet {
+    margin-bottom: 12px;
+    padding: 8px 12px;
+    background: #2a2a2a;
+    border-radius: 6px;
+    border-left: 3px solid #60a5fa;
+    display: none; /* Hidden by default, shown when events exist */
+}
+
+.today-calendar-snippet.has-events {
+    display: block;
+}
+
+.today-snippet-events {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.today-snippet-event {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.9em;
+}
+
+.today-snippet-time {
+    color: #60a5fa;
+    font-weight: bold;
+    min-width: 60px;
+    font-size: 0.85em;
+}
+
+.today-snippet-title {
+    color: #ffffff;
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .header-weather {
@@ -470,5 +533,177 @@ button:hover {
         font-size: 10px;
         top: 1px;
         right: 1px;
+    }
+}
+
+/* Calendar Section Styles */
+.calendar-section {
+    margin-top: 10px;
+    padding-top: 5px;
+    border-top: 2px solid #555;
+}
+
+.calendar-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: flex-start;
+    user-select: none;
+    margin-bottom: 8px;
+    position: relative;
+    gap: 10px;
+}
+
+.calendar-header h2 {
+    margin: 0;
+    color: #ffffff;
+    font-size: 1.5em;
+    flex: 0 0 auto;
+}
+
+.calendar-toggle {
+    background: none;
+    border: none;
+    color: #acacac;
+    font-size: 1.2em;
+    cursor: pointer;
+    padding: 2px;
+    border-radius: 4px;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    margin-left: 4px;
+}
+
+.calendar-toggle:hover {
+    background: rgba(96, 165, 250, 0.1);
+}
+
+.calendar-toggle.collapsed .toggle-icon {
+    transform: rotate(-90deg);
+}
+
+.calendar-content {
+    opacity: 1;
+    max-height: 250px;
+    overflow: hidden;
+    transition: opacity 0.5s ease, max-height 0.5s ease;
+}
+
+.calendar-content.hidden {
+    opacity: 0;
+    max-height: 0;
+}
+
+.calendar-container {
+    background: #1a1a1a;
+    border-radius: 8px;
+    padding: 8px;
+    margin-top: 8px;
+    border: 1px solid #555;
+}
+
+.calendar-events-container {
+    background: #333333;
+    border-radius: 8px;
+    padding: 12px;
+    margin-top: 8px;
+    border: 1px solid #555;
+    max-height: 250px;
+    overflow-y: auto;
+}
+
+.calendar-loading {
+    text-align: center;
+    color: #888;
+    padding: 20px;
+    font-style: italic;
+}
+
+.no-events {
+    text-align: center;
+    color: #888;
+    padding: 20px;
+    font-style: italic;
+}
+
+.events-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.event-item {
+    background: #2a2a2a;
+    border-radius: 6px;
+    padding: 12px;
+    border-left: 4px solid #60a5fa;
+}
+
+.event-time {
+    font-size: 0.9em;
+    color: #60a5fa;
+    font-weight: bold;
+    margin-bottom: 4px;
+}
+
+.event-summary {
+    font-size: 1em;
+    color: #ffffff;
+    font-weight: 500;
+    margin-bottom: 4px;
+}
+
+.event-description {
+    font-size: 0.85em;
+    color: #cccccc;
+    margin-bottom: 4px;
+    line-height: 1.4;
+}
+
+.event-location {
+    font-size: 0.8em;
+    color: #aaa;
+}
+
+.calendar-error {
+    text-align: center;
+    color: #ff6b6b;
+    padding: 20px;
+    font-style: italic;
+}
+
+/* Mobile responsive for calendar */
+@media (max-width: 600px) {
+    .calendar-header h2 {
+        font-size: 5vw;
+    }
+    
+    .calendar-events-container {
+        padding: 3vw;
+        max-height: 200px;
+    }
+    
+    .event-item {
+        padding: 3vw;
+    }
+    
+    .event-time {
+        font-size: 2.8vw;
+    }
+    
+    .event-summary {
+        font-size: 3.2vw;
+    }
+    
+    .event-description {
+        font-size: 2.6vw;
+    }
+    
+    .event-location {
+        font-size: 2.4vw;
+    }
+    
+    .calendar-content {
+        max-height: 220px;
     }
 }

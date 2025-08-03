@@ -56,7 +56,10 @@ async function init() {
     setInterval(fetchWeatherForecast, 1800000); // Update every 30 minutes
 
     // Setup collapsible weather (collapsed by default)
+    // Initialize weather, calendar toggles, and today's snippet
     setupWeatherToggle(true);
+    setupCalendarToggle(true);
+    loadTodayCalendarSnippet();
 
     setupSettingsProximity();
 }
@@ -512,6 +515,199 @@ function setupWeatherToggle(startCollapsed = false) {
             weatherToggle.classList.add('collapsed');
         }
     });
+}
+
+// Setup collapsible calendar functionality
+function setupCalendarToggle(startCollapsed = false) {
+    const calendarHeader = document.getElementById('calendarHeader');
+    const calendarToggle = document.getElementById('calendarToggle');
+    const calendarContent = document.getElementById('calendarContent');
+
+    if (!calendarHeader || !calendarToggle || !calendarContent) return;
+
+    // Collapse by default if requested
+    if (startCollapsed) {
+        calendarContent.classList.add('hidden');
+        calendarToggle.classList.add('collapsed');
+    }
+
+    // Only toggle when clicking the button, not the whole header
+    calendarToggle.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const isCollapsed = calendarContent.classList.contains('hidden');
+        if (isCollapsed) {
+            calendarContent.classList.remove('hidden');
+            calendarToggle.classList.remove('collapsed');
+            // Load calendar data when first opened
+            loadCalendarEvents();
+        } else {
+            calendarContent.classList.add('hidden');
+            calendarToggle.classList.add('collapsed');
+        }
+    });
+}
+
+// Load today's calendar events snippet
+async function loadTodayCalendarSnippet() {
+    const container = document.getElementById('today-calendar-snippet');
+    
+    if (!container) return;
+    
+    try {
+        const response = await fetch('/api/calendar/today');
+        const data = await response.json();
+        
+        if (data.success && data.events.length > 0) {
+            displayTodaySnippet(data.events);
+        } else {
+            // Hide snippet if no events today
+            container.classList.remove('has-events');
+            container.style.display = 'none';
+        }
+    } catch (error) {
+        console.error('Error loading today calendar snippet:', error);
+        // Hide snippet on error
+        container.classList.remove('has-events');
+        container.style.display = 'none';
+    }
+}
+
+// Display today's events snippet
+function displayTodaySnippet(events) {
+    const container = document.getElementById('today-calendar-snippet');
+    
+    if (!container || events.length === 0) return;
+    
+    let html = '<div class="today-snippet-events">';
+    
+    events.forEach(event => {
+        const startTime = new Date(event.start);
+        const timeStr = startTime.toLocaleTimeString('en-SG', { 
+            hour: 'numeric', 
+            minute: '2-digit',
+            hour12: true 
+        });
+        
+        html += `
+            <div class="today-snippet-event">
+                <div class="today-snippet-time">${timeStr}</div>
+                <div class="today-snippet-title">${escapeHtml(event.summary)}</div>
+            </div>
+        `;
+    });
+    
+    html += '</div>';
+    container.innerHTML = html;
+    container.classList.add('has-events');
+    container.style.display = 'block';
+}
+
+// Load calendar events from server
+async function loadCalendarEvents() {
+    const container = document.getElementById('calendarEventsContainer');
+    
+    if (!container) return;
+    
+    // Show loading state
+    container.innerHTML = '<div class="calendar-loading">Loading calendar events...</div>';
+    
+    try {
+        const response = await fetch('/api/calendar');
+        const data = await response.json();
+        
+        if (data.success) {
+            displayCalendarEvents(data.events);
+        } else {
+            showCalendarError('Failed to load calendar events');
+        }
+    } catch (error) {
+        console.error('Error loading calendar:', error);
+        showCalendarError('Unable to connect to calendar service');
+    }
+}
+
+// Display calendar events in the UI
+function displayCalendarEvents(events) {
+    const container = document.getElementById('calendarEventsContainer');
+    
+    if (!container) return;
+    
+    if (!events || events.length === 0) {
+        container.innerHTML = '<div class="no-events">No upcoming events in the next 7 days</div>';
+        return;
+    }
+    
+    let html = '<div class="events-list">';
+    
+    events.forEach(event => {
+        const startTime = new Date(event.start);
+        const endTime = event.end ? new Date(event.end) : null;
+        
+        html += `
+            <div class="event-item">
+                <div class="event-time">${formatEventTime(startTime, endTime)}</div>
+                <div class="event-summary">${escapeHtml(event.summary)}</div>
+                ${event.description ? `<div class="event-description">${escapeHtml(event.description)}</div>` : ''}
+                ${event.location ? `<div class="event-location">📍 ${escapeHtml(event.location)}</div>` : ''}
+            </div>
+        `;
+    });
+    
+    html += '</div>';
+    container.innerHTML = html;
+}
+
+// Show calendar error message
+function showCalendarError(message) {
+    const container = document.getElementById('calendarEventsContainer');
+    if (container) {
+        container.innerHTML = `<div class="calendar-error">${escapeHtml(message)}</div>`;
+    }
+}
+
+// Format event time for display
+function formatEventTime(startTime, endTime) {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const tomorrow = new Date(today.getTime() + 24 * 60 * 60 * 1000);
+    const eventDate = new Date(startTime.getFullYear(), startTime.getMonth(), startTime.getDate());
+    
+    let dateStr = '';
+    if (eventDate.getTime() === today.getTime()) {
+        dateStr = 'Today';
+    } else if (eventDate.getTime() === tomorrow.getTime()) {
+        dateStr = 'Tomorrow';
+    } else {
+        dateStr = startTime.toLocaleDateString('en-SG', { 
+            weekday: 'short', 
+            month: 'short', 
+            day: 'numeric' 
+        });
+    }
+    
+    const timeStr = startTime.toLocaleTimeString('en-SG', { 
+        hour: 'numeric', 
+        minute: '2-digit',
+        hour12: true 
+    });
+    
+    if (endTime) {
+        const endTimeStr = endTime.toLocaleTimeString('en-SG', { 
+            hour: 'numeric', 
+            minute: '2-digit',
+            hour12: true 
+        });
+        return `${dateStr} ${timeStr} - ${endTimeStr}`;
+    } else {
+        return `${dateStr} ${timeStr}`;
+    }
+}
+
+// Escape HTML to prevent XSS
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
 }
 
 // Update header weather icons for majority region
