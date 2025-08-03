@@ -553,12 +553,38 @@ async function loadTodayCalendarSnippet() {
     
     if (!container) return;
     
+    // Get calendar URL from localStorage
+    const calendarUrl = localStorage.getItem('calendarUrl');
+    
+    if (!calendarUrl) {
+        // Hide snippet if no calendar URL configured
+        container.classList.remove('has-events');
+        container.style.display = 'none';
+        return;
+    }
+    
     try {
-        const response = await fetch('/api/calendar/today');
-        const data = await response.json();
+        console.log('Attempting to fetch calendar from:', calendarUrl);
         
-        if (data.success && data.events.length > 0) {
-            displayTodaySnippet(data.events);
+        // Use server-side proxy to avoid CORS issues
+        const proxyUrl = `/calendar-proxy?url=${encodeURIComponent(calendarUrl)}`;
+        const response = await fetch(proxyUrl);
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const icalData = await response.text();
+        console.log('iCal data received, length:', icalData.length);
+        
+        const events = parseICalData(icalData);
+        console.log('Parsed events:', events.length);
+        
+        const todayEvents = filterTodayEvents(events);
+        console.log('Today events:', todayEvents.length);
+        
+        if (todayEvents.length > 0) {
+            displayTodaySnippet(todayEvents);
         } else {
             // Hide snippet if no events today
             container.classList.remove('has-events');
@@ -566,10 +592,135 @@ async function loadTodayCalendarSnippet() {
         }
     } catch (error) {
         console.error('Error loading today calendar snippet:', error);
-        // Hide snippet on error
-        container.classList.remove('has-events');
-        container.style.display = 'none';
+        
+        // Show a fallback message for CORS issues
+        if (error.message.includes('CORS') || error.message.includes('fetch')) {
+            container.innerHTML = `
+                <div class="today-snippet-events">
+                    <div class="today-snippet-event">
+                        <div class="today-snippet-time">📅</div>
+                        <div class="today-snippet-title">Calendar configured (CORS limitation)</div>
+                    </div>
+                </div>
+            `;
+            container.classList.add('has-events');
+            container.style.display = 'block';
+        } else {
+            // Hide snippet on other errors
+            container.classList.remove('has-events');
+            container.style.display = 'none';
+        }
     }
+}
+
+// Extract calendar ID from Google Calendar embed URL (keeping for potential future use)
+function extractCalendarId(embedUrl) {
+    try {
+        const url = new URL(embedUrl);
+        const src = url.searchParams.get('src');
+        if (src) {
+            return decodeURIComponent(src);
+        }
+        return null;
+    } catch (error) {
+        console.error('Error parsing calendar URL:', error);
+        return null;
+    }
+}
+
+// Simple iCal parser for basic event extraction
+function parseICalData(icalData) {
+    const events = [];
+    const lines = icalData.split('\n').map(line => line.trim());
+    
+    let currentEvent = null;
+    
+    for (let line of lines) {
+        if (line === 'BEGIN:VEVENT') {
+            currentEvent = {};
+        } else if (line === 'END:VEVENT' && currentEvent) {
+            if (currentEvent.dtstart && currentEvent.summary) {
+                events.push(currentEvent);
+            }
+            currentEvent = null;
+        } else if (currentEvent && line.includes(':')) {
+            const colonIndex = line.indexOf(':');
+            const key = line.substring(0, colonIndex).toLowerCase();
+            const value = line.substring(colonIndex + 1);
+            
+            if (key.startsWith('dtstart')) {
+                currentEvent.dtstart = parseICalDate(value);
+            } else if (key.startsWith('dtend')) {
+                currentEvent.dtend = parseICalDate(value);
+            } else if (key === 'summary') {
+                currentEvent.summary = value.replace(/\\n/g, '\n').replace(/\\,/g, ',');
+            } else if (key === 'description') {
+                currentEvent.description = value.replace(/\\n/g, '\n').replace(/\\,/g, ',');
+            } else if (key === 'location') {
+                currentEvent.location = value.replace(/\\n/g, '\n').replace(/\\,/g, ',');
+            }
+        }
+    }
+    
+    return events;
+}
+
+// Parse iCal date format
+function parseICalDate(dateString) {
+    if (dateString.includes('T')) {
+        // DateTime format: 20250803T143000Z
+        const clean = dateString.replace('Z', '').replace(/[^\d]/g, '');
+        if (clean.length >= 8) {
+            const year = clean.substring(0, 4);
+            const month = clean.substring(4, 6);
+            const day = clean.substring(6, 8);
+            const hour = clean.substring(8, 10) || '00';
+            const minute = clean.substring(10, 12) || '00';
+            const second = clean.substring(12, 14) || '00';
+            
+            return new Date(`${year}-${month}-${day}T${hour}:${minute}:${second}${dateString.endsWith('Z') ? 'Z' : ''}`);
+        }
+    } else {
+        // Date only format: 20250803
+        const clean = dateString.replace(/[^\d]/g, '');
+        if (clean.length >= 8) {
+            const year = clean.substring(0, 4);
+            const month = clean.substring(4, 6);
+            const day = clean.substring(6, 8);
+            return new Date(`${year}-${month}-${day}`);
+        }
+    }
+    return new Date(dateString);
+}
+
+// Filter events for today only
+function filterTodayEvents(events) {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const tomorrow = new Date(today.getTime() + 24 * 60 * 60 * 1000);
+    
+    return events
+        .filter(event => {
+            if (!event.dtstart) return false;
+            const eventDate = new Date(event.dtstart.getFullYear(), event.dtstart.getMonth(), event.dtstart.getDate());
+            return eventDate.getTime() === today.getTime() && event.dtstart >= now;
+        })
+        .sort((a, b) => a.dtstart - b.dtstart)
+        .slice(0, 3); // Limit to 3 events for snippet
+}
+
+// Filter events for upcoming week
+function filterUpcomingEvents(events) {
+    const now = new Date();
+    const weekFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+    
+    return events
+        .filter(event => {
+            if (!event.dtstart) return false;
+            return event.dtstart >= now && event.dtstart <= weekFromNow;
+        })
+        .sort((a, b) => a.dtstart - b.dtstart)
+        .slice(0, 10); // Limit to 10 events
 }
 
 // Display today's events snippet
@@ -581,7 +732,7 @@ function displayTodaySnippet(events) {
     let html = '<div class="today-snippet-events">';
     
     events.forEach(event => {
-        const startTime = new Date(event.start);
+        const startTime = event.dtstart;
         const timeStr = startTime.toLocaleTimeString('en-SG', { 
             hour: 'numeric', 
             minute: '2-digit',
@@ -608,21 +759,51 @@ async function loadCalendarEvents() {
     
     if (!container) return;
     
+    // Get calendar URL from localStorage
+    const calendarUrl = localStorage.getItem('calendarUrl');
+    
+    if (!calendarUrl) {
+        container.innerHTML = '<div class="no-events">No calendar configured. Please add a calendar URL in Settings.</div>';
+        return;
+    }
+    
     // Show loading state
     container.innerHTML = '<div class="calendar-loading">Loading calendar events...</div>';
     
     try {
-        const response = await fetch('/api/calendar');
-        const data = await response.json();
+        console.log('Attempting to fetch full calendar from:', calendarUrl);
         
-        if (data.success) {
-            displayCalendarEvents(data.events);
+        // Use server-side proxy to avoid CORS issues
+        const proxyUrl = `/calendar-proxy?url=${encodeURIComponent(calendarUrl)}`;
+        const response = await fetch(proxyUrl);
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const icalData = await response.text();
+        console.log('Full calendar iCal data received, length:', icalData.length);
+        
+        const events = parseICalData(icalData);
+        console.log('Full calendar parsed events:', events.length);
+        
+        const upcomingEvents = filterUpcomingEvents(events);
+        console.log('Full calendar upcoming events:', upcomingEvents.length);
+        
+        if (upcomingEvents.length > 0) {
+            displayCalendarEvents(upcomingEvents);
         } else {
-            showCalendarError('Failed to load calendar events');
+            container.innerHTML = '<div class="no-events">No upcoming events in the next 7 days</div>';
         }
     } catch (error) {
         console.error('Error loading calendar:', error);
-        showCalendarError('Unable to connect to calendar service');
+        
+        // Show specific error message for CORS issues
+        if (error.message.includes('CORS') || error.message.includes('fetch')) {
+            showCalendarError('Google Calendar blocks direct browser access due to CORS policy. This is a browser security limitation.');
+        } else {
+            showCalendarError('Unable to load calendar. Please check your calendar secret URL in Settings.');
+        }
     }
 }
 
@@ -640,8 +821,8 @@ function displayCalendarEvents(events) {
     let html = '<div class="events-list">';
     
     events.forEach(event => {
-        const startTime = new Date(event.start);
-        const endTime = event.end ? new Date(event.end) : null;
+        const startTime = event.dtstart;
+        const endTime = event.dtend;
         
         html += `
             <div class="event-item">

@@ -66,6 +66,7 @@ body {
         margin-top: 10px;
         margin-bottom: 15px;
         padding: 3vw;
+        max-width: 100%; /* Full width on mobile */
     }
     
     .today-snippet-time {
@@ -103,6 +104,7 @@ body {
     border-radius: 6px;
     border-left: 3px solid #60a5fa;
     display: none; /* Hidden by default, shown when events exist */
+    max-width: 45%; /* More restrictive to stay under title only */
 }
 
 .today-calendar-snippet.has-events {
@@ -610,6 +612,20 @@ button:hover {
     border: 1px solid #555;
     max-height: 250px;
     overflow-y: auto;
+}
+
+.calendar-iframe-container {
+    background: #333333;
+    border-radius: 8px;
+    padding: 8px;
+    margin-top: 8px;
+    border: 1px solid #555;
+    max-height: 420px;
+    overflow: hidden;
+}
+
+.calendar-iframe-container iframe {
+    border-radius: 4px;
 }
 
 .calendar-loading {

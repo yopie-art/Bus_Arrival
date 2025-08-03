@@ -223,6 +223,18 @@
             </div>
         </div>
 
+        <div class="settings-section">
+            <h2>Google Calendar Integration (Optional)</h2>
+            <p style="color: #ccc; font-size: 14px; margin-bottom: 10px;">
+                Enter your Google Calendar <strong>secret iCal address</strong> to display your calendar events. 
+            </p>
+            <p style="color: #60a5fa; font-size: 13px; margin-bottom: 10px; background: rgba(96, 165, 250, 0.1); padding: 8px; border-radius: 4px;">
+                ✅ <strong>Privacy-friendly:</strong> Your calendar can remain <strong>private</strong>. 
+                Get the "Secret address in iCal format" from Google Calendar → Settings & sharing → Integrate calendar.
+            </p>
+            <input type="url" id="calendarUrl" class="search-input" placeholder="https://calendar.google.com/calendar/ical/your_calendar_id/private-xxx/basic.ics" style="margin-bottom: 10px;">
+        </div>
+
         <div class="settings-actions">
             <button id="saveChanges" class="save-button" disabled>Apply Changes</button>
             <span id="saveStatus" class="save-status" style="display: none;"></span>

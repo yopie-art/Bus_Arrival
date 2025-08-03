@@ -2,6 +2,7 @@
 let allBusStops = [];
 let selectedBusStops = new Set(); // Store selected bus stop codes to prevent duplicates
 let originalSelections = new Set(); // Store original selections to track changes
+let originalCalendarUrl = ''; // Store original calendar URL to track changes
 let hasChanges = false;
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -10,6 +11,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const basket = document.getElementById('selectedBasket');
     const saveButton = document.getElementById('saveChanges');
     const saveStatus = document.getElementById('saveStatus');
+    const calendarUrl = document.getElementById('calendarUrl');
     
     // Load bus stops data
     await loadBusStops();
@@ -17,8 +19,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     // Load existing selections if any
     await loadExistingSelections();
     
+    // Load existing calendar URL
+    loadCalendarUrl();
+    
     // Setup search functionality
     setupSearchInput(searchInput, dropdown, basket);
+    
+    // Setup calendar URL change detection
+    calendarUrl.addEventListener('input', checkForChanges);
     
     // Setup save functionality
     saveButton.addEventListener('click', async () => {
@@ -316,32 +324,42 @@ function removeFromBasket(code, itemElement) {
     checkForChanges();
 }
 
-// Function to check if selections have changed and update button state
-function checkForChanges() {
-    const currentSelections = new Set(selectedBusStops);
-    
-    // Check if sets are equal
-    const isEqual = currentSelections.size === originalSelections.size && 
-                    [...currentSelections].every(x => originalSelections.has(x));
-    
-    hasChanges = !isEqual;
-    
-    const saveButton = document.getElementById('saveChanges');
-    saveButton.disabled = !hasChanges;
-    
-    if (hasChanges) {
-        saveButton.textContent = 'Apply Changes';
-    } else {
-        saveButton.textContent = 'No Changes';
-    }
-}
-
 // Debug function to clear localStorage (can be called from browser console)
 window.clearBusStopSelections = function() {
     localStorage.removeItem('busStopSelections');
     console.log('Cleared bus stop selections from localStorage');
     location.reload();
 };
+
+// Load calendar URL from localStorage
+function loadCalendarUrl() {
+    const savedUrl = localStorage.getItem('calendarUrl');
+    const calendarInput = document.getElementById('calendarUrl');
+    if (savedUrl && calendarInput) {
+        calendarInput.value = savedUrl;
+        originalCalendarUrl = savedUrl;
+    }
+}
+
+// Check for any changes (bus stops or calendar URL)
+function checkForChanges() {
+    const calendarInput = document.getElementById('calendarUrl');
+    const currentCalendarUrl = calendarInput ? calendarInput.value.trim() : '';
+    
+    // Check if bus stop selections have changed
+    const busStopsChanged = selectedBusStops.size !== originalSelections.size || 
+                           ![...selectedBusStops].every(code => originalSelections.has(code));
+    
+    // Check if calendar URL has changed
+    const calendarChanged = currentCalendarUrl !== originalCalendarUrl;
+    
+    hasChanges = busStopsChanged || calendarChanged;
+    
+    const saveButton = document.getElementById('saveChanges');
+    if (saveButton) {
+        saveButton.disabled = !hasChanges;
+    }
+}
 
 async function saveSelections(saveStatus) {
     const saveButton = document.getElementById('saveChanges');
@@ -364,6 +382,17 @@ async function saveSelections(saveStatus) {
         
         // Save to localStorage (primary storage)
         localStorage.setItem('busStopSelections', JSON.stringify(selectionsArray));
+        
+        // Save calendar URL to localStorage
+        const calendarInput = document.getElementById('calendarUrl');
+        if (calendarInput) {
+            const calendarUrl = calendarInput.value.trim();
+            if (calendarUrl) {
+                localStorage.setItem('calendarUrl', calendarUrl);
+            } else {
+                localStorage.removeItem('calendarUrl');
+            }
+        }
         
         // Also save to backend (as backup/fallback)
         try {
