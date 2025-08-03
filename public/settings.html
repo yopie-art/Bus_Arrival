@@ -229,10 +229,19 @@
                 Enter your Google Calendar <strong>secret iCal address</strong> to display your calendar events. 
             </p>
             <p style="color: #60a5fa; font-size: 13px; margin-bottom: 10px; background: rgba(96, 165, 250, 0.1); padding: 8px; border-radius: 4px;">
-                ✅ <strong>Privacy-friendly:</strong> Your calendar can remain <strong>private</strong>. 
-                Get the "Secret address in iCal format" from Google Calendar → Settings & sharing → Integrate calendar.
+                <strong>Privacy note:</strong> Your calendar remains <strong>private</strong>. Only you can see the events, and they will not be shared with others. 
+                Get the "Secret address in iCal format" from: Google Calendar → Settings & sharing → Integrate calendar. 
+                <br><br>
+                You may choose to reset your iCal address anytime at Google Calendar setting page to disable access to any previously added address.
             </p>
-            <input type="url" id="calendarUrl" class="search-input" placeholder="https://calendar.google.com/calendar/ical/your_calendar_id/private-xxx/basic.ics" style="margin-bottom: 10px;">
+            <div style="position: relative; margin-bottom: 10px;">
+                <input type="password" id="calendarUrl" class="search-input" placeholder="https://calendar.google.com/calendar/ical/your_calendar_id/private-xxx/basic.ics" style="padding-right: 45px;">
+                <button type="button" id="toggleCalendarUrl" style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); background: none; border: none; color: #888; cursor: pointer; font-size: 16px; padding: 0; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/>
+                    </svg>
+                </button>
+            </div>
         </div>
 
         <div class="settings-actions">

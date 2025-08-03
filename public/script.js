@@ -733,11 +733,21 @@ function displayTodaySnippet(events) {
     
     events.forEach(event => {
         const startTime = event.dtstart;
-        const timeStr = startTime.toLocaleTimeString('en-SG', { 
+        const endTime = event.dtend;
+        
+        const startTimeStr = startTime.toLocaleTimeString('en-SG', { 
             hour: 'numeric', 
             minute: '2-digit',
             hour12: true 
         });
+        
+        const endTimeStr = endTime ? endTime.toLocaleTimeString('en-SG', { 
+            hour: 'numeric', 
+            minute: '2-digit',
+            hour12: true 
+        }) : '';
+        
+        const timeStr = endTime ? `${startTimeStr} - ${endTimeStr}` : startTimeStr;
         
         html += `
             <div class="today-snippet-event">
