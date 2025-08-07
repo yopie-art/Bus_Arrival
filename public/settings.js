@@ -4,6 +4,7 @@ let selectedBusStops = new Set(); // Store selected bus stop codes to prevent du
 let originalSelections = new Set(); // Store original selections to track changes
 let originalCalendarUrl = ''; // Store original calendar URL to track changes
 let hasChanges = false;
+let fullCalendarUrl = ''; // Global scope for calendar URL
 
 document.addEventListener("DOMContentLoaded", async () => {
     const searchInput = document.getElementById('busStopSearch');
@@ -13,6 +14,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const saveStatus = document.getElementById('saveStatus');
     const calendarUrl = document.getElementById('calendarUrl');
     const toggleCalendarUrl = document.getElementById('toggleCalendarUrl');
+    const copyCalendarUrl = document.getElementById('copyCalendarUrl');
     
     // Load bus stops data
     await loadBusStops();
@@ -26,29 +28,77 @@ document.addEventListener("DOMContentLoaded", async () => {
     // Setup search functionality
     setupSearchInput(searchInput, dropdown, basket);
     
-    // Setup calendar URL change detection
-    calendarUrl.addEventListener('input', checkForChanges);
+    // Setup calendar URL change detection and character limiting
+    calendarUrl.addEventListener('input', (e) => {
+        if (calendarUrl.type === 'password') {
+            // Store the full URL
+            fullCalendarUrl = e.target.value;
+            
+            // Limit display to exactly 12 dots maximum
+            if (fullCalendarUrl.length > 0) {
+                if (fullCalendarUrl.length <= 12) {
+                    e.target.value = '•'.repeat(fullCalendarUrl.length);
+                } else {
+                    e.target.value = '•'.repeat(12);
+                }
+            }
+        } else {
+            fullCalendarUrl = e.target.value;
+        }
+        checkForChanges();
+    });
     
-    // Setup calendar URL toggle functionality
+    // Function to get the actual calendar URL value
+    function getCalendarUrlValue() {
+        return calendarUrl.type === 'password' ? fullCalendarUrl : calendarUrl.value;
+    }
+    
+    // Setup toggle functionality
     toggleCalendarUrl.addEventListener('click', () => {
         if (calendarUrl.type === 'password') {
+            // Show the URL
             calendarUrl.type = 'text';
-            // Change to "eye-off" icon when showing
+            calendarUrl.value = fullCalendarUrl; // Show full URL
             toggleCalendarUrl.innerHTML = `
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"/>
-                </svg>
-            `;
-            toggleCalendarUrl.style.color = '#60a5fa';
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                    <circle cx="12" cy="12" r="3"/>
+                    <path d="M22 12l-2-2-2 2 2 2 2-2z"/>
+                </svg>`;
         } else {
+            // Hide the URL
             calendarUrl.type = 'password';
-            // Change back to "eye" icon when hiding
+            fullCalendarUrl = calendarUrl.value; // Update stored value
+            // Apply character limiting for display
+            if (fullCalendarUrl.length > 0) {
+                if (fullCalendarUrl.length <= 12) {
+                    calendarUrl.value = '•'.repeat(fullCalendarUrl.length);
+                } else {
+                    calendarUrl.value = '•'.repeat(12);
+                }
+            }
             toggleCalendarUrl.innerHTML = `
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/>
-                </svg>
-            `;
-            toggleCalendarUrl.style.color = '#888';
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                    <circle cx="12" cy="12" r="3"/>
+                </svg>`;
+        }
+    });
+    
+    // Setup copy functionality
+    copyCalendarUrl.addEventListener('click', async () => {
+        try {
+            const url = getCalendarUrlValue().trim();
+            if (!url) {
+                showCopyFeedback(copyCalendarUrl, 'No URL to copy', false);
+                return;
+            }
+            
+            await navigator.clipboard.writeText(url);
+            showCopyFeedback(copyCalendarUrl, 'Copied!', true);
+        } catch (err) {
+            console.error('Failed to copy: ', err);
+            showCopyFeedback(copyCalendarUrl, 'Copy failed', false);
         }
     });
     
@@ -57,6 +107,20 @@ document.addEventListener("DOMContentLoaded", async () => {
         await saveSelections(saveStatus);
     });
 });
+
+// Function to show copy feedback
+function showCopyFeedback(button, message, success) {
+    const originalColor = button.style.color;
+    const originalTitle = button.title;
+    
+    button.style.color = success ? '#4ade80' : '#ff6b6b';
+    button.title = message;
+    
+    setTimeout(() => {
+        button.style.color = originalColor;
+        button.title = originalTitle;
+    }, 1500);
+}
 
 async function loadBusStops() {
     try {
@@ -109,12 +173,12 @@ async function loadExistingSelections() {
                         originalSelections.add(selection.code); // Track original selections
                     }
                 });
-                console.log('Loaded selections from localStorage:', selections.length);
+                console.log(`Loaded ${selections.length} existing selections from localStorage`);
                 return;
             }
         }
-        
-        // Fallback: try to load from backend (for migration purposes)
+
+        // If no localStorage data, try to fetch from backend
         const response = await fetch('/bus-stop-selections');
         if (response.ok) {
             const selections = await response.json();
@@ -125,9 +189,7 @@ async function loadExistingSelections() {
                         originalSelections.add(selection.code); // Track original selections
                     }
                 });
-                // Migrate to localStorage
-                localStorage.setItem('busStopSelections', JSON.stringify(selections));
-                console.log('Migrated selections from backend to localStorage');
+                console.log(`Loaded ${selections.length} existing selections from backend`);
             }
         }
     } catch (error) {
@@ -232,7 +294,7 @@ function showDropdown(dropdown, filteredStops, input, basket, setSelectingCallba
             option.addEventListener('click', (e) => {
                 e.preventDefault(); // Prevent any default behavior
                 if (setSelectingCallback) setSelectingCallback();
-                console.log('Option clicked:', option.dataset.code, option.dataset.description);
+                console.log('Option click:', option.dataset.code, option.dataset.description);
                 selectOption(input, dropdown, option, basket);
             });
             
@@ -243,13 +305,14 @@ function showDropdown(dropdown, filteredStops, input, basket, setSelectingCallba
     dropdown.style.display = 'block';
 }
 
-function hideDropdown(dropdown) {
-    dropdown.style.display = 'none';
-}
-
 function updateSelection(options, selectedIndex) {
     options.forEach((option, index) => {
-        option.classList.toggle('selected', index === selectedIndex);
+        if (index === selectedIndex) {
+            option.classList.add('selected');
+            option.scrollIntoView({ block: 'nearest' });
+        } else {
+            option.classList.remove('selected');
+        }
     });
 }
 
@@ -257,35 +320,32 @@ function selectOption(input, dropdown, option, basket) {
     const code = option.dataset.code;
     const description = option.dataset.description;
     
-    console.log('selectOption called with:', { code, description, option, hasCode: !!code, hasDescription: !!description });
+    console.log('Selecting option:', { code, description });
     
     if (!code || !description) {
-        console.error('Missing code or description:', { code, description });
+        console.error('Invalid option data:', option.dataset);
         return;
     }
     
-    // Check if already selected
-    if (selectedBusStops.has(code)) {
-        console.log(`Bus stop ${code} is already selected`);
-        hideDropdown(dropdown);
-        input.value = '';
-        return;
-    }
-    
-    // Add to basket
-    addToBasket(code, description, true); // Enable change detection
-    
-    // Clear input and hide dropdown
+    addToBasket(code, description);
     input.value = '';
     hideDropdown(dropdown);
-    
-    console.log(`Added bus stop: ${code} - ${description}`);
-    
-    // Re-focus the input for continued searching
-    setTimeout(() => input.focus(), 50);
 }
 
-function addToBasket(code, description, detectChanges = true) {
+function hideDropdown(dropdown) {
+    dropdown.style.display = 'none';
+}
+
+function addToBasket(code, description, triggerChangeDetection = true) {
+    // Check if already selected
+    if (selectedBusStops.has(code)) {
+        console.log(`Bus stop ${code} already selected`);
+        return;
+    }
+    
+    selectedBusStops.add(code);
+    console.log(`Added bus stop ${code} to selections`);
+    
     const basket = document.getElementById('selectedBasket');
     
     // Remove empty message if it exists
@@ -294,81 +354,69 @@ function addToBasket(code, description, detectChanges = true) {
         emptyMessage.remove();
     }
     
-    // Add to selected set
-    selectedBusStops.add(code);
-    
-    // Create basket item
     const item = document.createElement('div');
     item.className = 'selected-item';
     item.dataset.code = code;
     
-    const text = document.createElement('span');
-    text.className = 'selected-item-text';
-    text.textContent = `${code} - ${description}`;
-    text.title = `${code} - ${description}`; // Tooltip for long names
+    item.innerHTML = `
+        <span class="selected-item-text">
+            <strong>${code}</strong><br>
+            <small>${description}</small>
+        </span>
+        <button class="remove-item" onclick="removeFromBasket('${code}')">×</button>
+    `;
     
-    const removeBtn = document.createElement('button');
-    removeBtn.className = 'remove-item';
-    removeBtn.textContent = '×';
-    removeBtn.title = 'Remove this bus stop';
-    removeBtn.addEventListener('click', () => {
-        removeFromBasket(code, item);
-    });
-    
-    item.appendChild(text);
-    item.appendChild(removeBtn);
     basket.appendChild(item);
     
-    // Check for changes if enabled
-    if (detectChanges) {
+    if (triggerChangeDetection) {
         checkForChanges();
     }
 }
 
-function removeFromBasket(code, itemElement) {
-    const basket = document.getElementById('selectedBasket');
-    
-    // Remove from selected set
+function removeFromBasket(code) {
     selectedBusStops.delete(code);
+    console.log(`Removed bus stop ${code} from selections`);
     
-    // Remove DOM element
-    itemElement.remove();
+    const basket = document.getElementById('selectedBasket');
+    const item = basket.querySelector(`[data-code="${code}"]`);
+    if (item) {
+        basket.removeChild(item);
+    }
     
-    // Add empty message if no items left
-    if (selectedBusStops.size === 0) {
+    // Show empty message if no items left
+    if (selectedBusStops.size === 0 && !basket.querySelector('.basket-empty')) {
         const emptyMessage = document.createElement('p');
         emptyMessage.className = 'basket-empty';
         emptyMessage.textContent = 'No bus stops selected. Search and click on a bus stop to add it here.';
         basket.appendChild(emptyMessage);
     }
     
-    console.log(`Removed bus stop: ${code}`);
-    
-    // Check for changes
     checkForChanges();
 }
 
-// Debug function to clear localStorage (can be called from browser console)
-window.clearBusStopSelections = function() {
-    localStorage.removeItem('busStopSelections');
-    console.log('Cleared bus stop selections from localStorage');
-    location.reload();
-};
-
-// Load calendar URL from localStorage
 function loadCalendarUrl() {
     const savedUrl = localStorage.getItem('calendarUrl');
     const calendarInput = document.getElementById('calendarUrl');
     if (savedUrl && calendarInput) {
+        fullCalendarUrl = savedUrl; // Set the global variable
         calendarInput.value = savedUrl;
         originalCalendarUrl = savedUrl;
+        
+        // If it's in password mode, mask it
+        if (calendarInput.type === 'password' && savedUrl.length > 0) {
+            if (savedUrl.length <= 12) {
+                calendarInput.value = '•'.repeat(savedUrl.length);
+            } else {
+                calendarInput.value = '•'.repeat(12);
+            }
+        }
     }
 }
 
 // Check for any changes (bus stops or calendar URL)
 function checkForChanges() {
     const calendarInput = document.getElementById('calendarUrl');
-    const currentCalendarUrl = calendarInput ? calendarInput.value.trim() : '';
+    const currentCalendarUrl = calendarInput ? (calendarInput.type === 'password' ? fullCalendarUrl : calendarInput.value.trim()) : '';
     
     // Check if bus stop selections have changed
     const busStopsChanged = selectedBusStops.size !== originalSelections.size || 
@@ -410,7 +458,7 @@ async function saveSelections(saveStatus) {
         // Save calendar URL to localStorage
         const calendarInput = document.getElementById('calendarUrl');
         if (calendarInput) {
-            const calendarUrl = calendarInput.value.trim();
+            const calendarUrl = calendarInput.type === 'password' ? fullCalendarUrl : calendarInput.value.trim();
             if (calendarUrl) {
                 localStorage.setItem('calendarUrl', calendarUrl);
             } else {
@@ -423,26 +471,36 @@ async function saveSelections(saveStatus) {
             const response = await fetch('/bus-stop-selections', {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'application/json',
                 },
                 body: JSON.stringify(selectionsArray)
             });
             
-            if (!response.ok) {
-                console.warn('Backend save failed, but localStorage save succeeded');
+            if (response.ok) {
+                console.log('Selections saved to backend successfully');
+            } else {
+                console.warn('Failed to save to backend, but localStorage save succeeded');
             }
         } catch (backendError) {
-            console.warn('Backend unavailable, but localStorage save succeeded:', backendError);
+            console.warn('Backend save failed, but localStorage save succeeded:', backendError);
         }
         
-        saveStatus.textContent = 'Settings saved successfully!';
-        saveStatus.style.color = '#4ade80';
-        saveStatus.style.display = 'inline';
-        console.log('Bus stop selections saved to localStorage:', selectionsArray.length);
+        // Update original selections to match current
+        originalSelections.clear();
+        selectedBusStops.forEach(code => originalSelections.add(code));
         
-        // Update original selections to reflect saved state
-        originalSelections = new Set(selectedBusStops);
-        checkForChanges(); // Update button state
+        // Update original calendar URL
+        originalCalendarUrl = calendarInput.type === 'password' ? fullCalendarUrl : calendarInput.value.trim();
+        
+        // Show success message
+        saveStatus.textContent = 'Settings saved successfully!';
+        saveStatus.className = 'save-status success';
+        saveStatus.style.display = 'block';
+        
+        // Reset button
+        saveButton.textContent = 'Save Changes';
+        hasChanges = false;
+        checkForChanges(); // This will disable the button since no changes
         
         // Hide success message after 3 seconds
         setTimeout(() => {
@@ -450,13 +508,20 @@ async function saveSelections(saveStatus) {
         }, 3000);
         
     } catch (error) {
-        console.error('Error saving settings:', error);
-        saveStatus.textContent = 'Error saving settings. Please try again.';
-        saveStatus.style.color = '#ff4444';
-        saveStatus.style.display = 'inline';
-    } finally {
-        // Re-enable button
-        saveButton.disabled = !hasChanges; // Only enable if there are changes
-        saveButton.textContent = hasChanges ? 'Apply Changes' : 'No Changes';
+        console.error('Save error:', error);
+        
+        // Show error message
+        saveStatus.textContent = 'Failed to save settings. Please try again.';
+        saveStatus.className = 'save-status error';
+        saveStatus.style.display = 'block';
+        
+        // Reset button
+        saveButton.textContent = 'Save Changes';
+        saveButton.disabled = false;
+        
+        // Hide error message after 5 seconds
+        setTimeout(() => {
+            saveStatus.style.display = 'none';
+        }, 5000);
     }
 }
