@@ -46,6 +46,8 @@ body {
         order: 1;
         gap: 10px;
         margin-left: 0; /* Reset margin-left auto for mobile */
+        justify-content: center; /* Center weather icons horizontally on mobile */
+        width: 100%;
     }
     
     .header-weather-item {
@@ -68,13 +70,25 @@ body {
         max-width: 45px;
     }
     
-    /* Mobile: Calendar snippet after weather, full width */
+    /* Mobile: Calendar snippet after weather, centered and sized to content */
     .today-calendar-snippet {
         order: 2;
         margin-top: 10px;
         margin-bottom: 15px;
         padding: 3vw;
-        max-width: 100%; /* Full width on mobile */
+        display: inline-block; /* shrink-wrap to content */
+        width: max-content;    /* as wide as the longest line */
+        max-width: 95vw;       /* but don't overflow the viewport */
+        margin-left: auto;     /* center horizontally */
+        margin-right: auto;    /* center horizontally */
+        text-align: left;      /* keep text left-aligned inside */
+    }
+    /* Override desktop .has-events to ensure inline-block on mobile */
+    .today-calendar-snippet.has-events {
+        display: inline-block;
+        width: max-content;
+        max-width: 95vw;
+        align-self: center; /* center within flex column */
     }
     
     .today-snippet-time {

@@ -114,7 +114,7 @@
             padding: 20px;
             display: flex;
             flex-wrap: wrap;
-            gap: 10px;
+            gap: 12px;
             align-items: flex-start;
         }
         
@@ -131,16 +131,23 @@
         }
         
         .selected-item {
-            background: #444444;
-            border: 1px solid #666;
-            border-radius: 6px;
-            padding: 8px 12px;
+            background: #3c3c3c;
+            border: 1px solid #555;
+            border-radius: 10px;
+            padding: 12px 14px;
             display: flex;
             align-items: center;
-            gap: 8px;
+            justify-content: space-between;
+            gap: 12px;
             color: #ffffff;
             font-size: 14px;
-            max-width: 300px;
+            max-width: 320px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.25);
+            transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.08s ease;
+        }
+        .selected-item:hover {
+            border-color: #777;
+            background: #424242;
         }
         
         .selected-item-text {
@@ -148,36 +155,69 @@
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
+            line-height: 1.2;
+        }
+        .selected-item-text strong {
+            display: block;
+            font-size: 16px;
+            line-height: 1.1;
+        }
+        .selected-item-text small {
+            display: block;
+            font-size: 13px;
+            color: #e6e6e6;
+            opacity: 0.9;
         }
         
         .remove-item {
-            background: none;
+            background: transparent;
             color: #ff6b6b;
-            border: none;
-            width: 16px;
-            height: 16px;
-            display: flex;
+            border: 1px solid rgba(255, 107, 107, 0.25);
+            width: 28px;
+            height: 28px;
+            display: inline-flex;
             align-items: center;
             justify-content: center;
             cursor: pointer;
-            font-size: 14px;
-            font-weight: bold;
+            font-size: 16px;
+            font-weight: 700;
+            line-height: 1;
+            padding: 0;
+            box-sizing: border-box;
             flex-shrink: 0;
-            border-radius: 2px;
-            transition: all 0.2s ease;
+            border-radius: 50%;
+            transition: background-color 0.15s ease, color 0.15s ease, transform 0.1s ease, border-color 0.15s ease;
+            align-self: center;
         }
         
         .remove-item:hover {
-            background: rgba(255, 107, 107, 0.1);
+            background: rgba(255, 107, 107, 0.12);
             color: #ff4444;
-            transform: scale(1.1);
+            border-color: rgba(255, 107, 107, 0.45);
+            transform: scale(1.06);
+        }
+        .remove-item:active {
+            transform: scale(0.98);
+        }
+        .remove-item:focus-visible {
+            outline: 2px solid #ff6b6b;
+            outline-offset: 2px;
         }
         
         .settings-actions {
             margin-top: 30px;
             display: flex;
-            gap: 15px;
-            align-items: center;
+            gap: 12px;
+            align-items: flex-start; /* top align so Cancel doesn't shift when status shows */
+            justify-content: flex-start;
+        }
+
+        .save-group {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            position: relative; /* allow absolute status positioning */
+            /* no gap: status is absolutely positioned */
         }
         
         .save-button {
@@ -190,26 +230,39 @@
             font-weight: bold;
             cursor: pointer;
             transition: background-color 0.2s;
+            display: inline-flex !important; /* override global button */
+            align-items: center;
+            justify-content: center;
+            margin: 0 !important; /* prevent flex auto-margins from pushing content */
+            min-width: 150px; /* keep width stable when text changes */
+            height: 44px; /* fixed height so sibling Cancel can align to it */
         }
         
         .save-button:hover {
             background: #3b82f6;
         }
         
-        .save-button:disabled {
+    .save-button:disabled {
             background: #555;
             cursor: not-allowed;
             opacity: 0.6;
         }
         
-        .save-button:disabled:hover {
+    .save-button:disabled:hover {
             background: #555;
         }
         
+        .cancel-wrapper {
+            height: 44px; /* match button height */
+            display: flex;
+            align-items: center; /* center Cancel vertically within fixed height */
+        }
+
         .back-link {
             color: #60a5fa;
             text-decoration: none;
             font-size: 16px;
+            align-self: auto; /* default alignment; wrapper controls centering */
         }
         
         .back-link:hover {
@@ -218,8 +271,25 @@
         
         .save-status {
             color: #4ade80;
-            font-size: 14px;
-            margin-left: 10px;
+            font-size: 12px;
+            margin-left: 0;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.5s ease;
+            font-style: italic;
+            position: absolute;
+            left: 0;
+            top: calc(100% + 6px); /* just below the button */
+            width: 100%;
+            pointer-events: none; /* ignore clicks */
+        }
+        .save-status.show {
+            opacity: 1;
+            visibility: visible;
+        }
+        .save-status.hide {
+            opacity: 0;
+            visibility: hidden;
         }
     </style>
 </head>
@@ -258,12 +328,12 @@
             </p>
             <div style="position: relative; margin-bottom: 10px;">
                 <input type="password" id="calendarUrl" class="search-input" placeholder="https://calendar.google.com/calendar/ical/your_calendar_id/private-xxx/basic.ics" style="padding-right: 90px;">
-                <button type="button" id="toggleCalendarUrl" style="position: absolute; right: 50px; top: 0px; background: none; border: none; color: #888; cursor: pointer; padding: 6px; width: 28px; height: 0px; display: flex; align-items: center; justify-content: center; border-radius: 4px;">
+                <button type="button" id="toggleCalendarUrl" style="position: absolute; right: 50px; top: 0; bottom: 0; margin-block: auto; margin-top: auto; margin-bottom: auto; background: none; border: none; color: #888; cursor: pointer; padding: 6px; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border-radius: 4px;">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
                         <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/>
                     </svg>
                 </button>
-                <button type="button" id="copyCalendarUrl" style="position: absolute; right: 14px; top: 0px; background: none; border: none; color: #888; cursor: pointer; padding: 6px; width: 28px; height: 0px; display: flex; align-items: center; justify-content: center; border-radius: 4px;" title="Copy to clipboard">
+                <button type="button" id="copyCalendarUrl" style="position: absolute; right: 14px; top: 0; bottom: 0; margin-block: auto; margin-top: auto; margin-bottom: auto; background: none; border: none; color: #888; cursor: pointer; padding: 6px; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border-radius: 4px;" title="Copy to clipboard">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
                         <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
                     </svg>
@@ -272,10 +342,14 @@
         </div>
 
         <div class="settings-actions">
-            <button id="saveChanges" class="save-button" disabled>Apply Changes</button>
-            <span id="saveStatus" class="save-status" style="display: none;"></span>
-            <a href="index.html" class="back-link">Cancel</a>
-        </div>
+                <div class="save-group">
+                    <button id="saveChanges" class="save-button" disabled>Apply Changes</button>
+                    <span id="saveStatus" class="save-status"></span>
+                </div>
+                <div class="cancel-wrapper">
+                    <a href="index.html" class="back-link">Cancel</a>
+                </div>
+            </div>
     </div>
 
     <script src="settings.js"></script>

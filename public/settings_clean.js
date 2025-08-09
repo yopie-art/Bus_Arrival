@@ -4,7 +4,6 @@ let selectedBusStops = new Set(); // Store selected bus stop codes to prevent du
 let originalSelections = new Set(); // Store original selections to track changes
 let originalCalendarUrl = ''; // Store original calendar URL to track changes
 let hasChanges = false;
-let fullCalendarUrl = ''; // Global scope for calendar URL
 
 document.addEventListener("DOMContentLoaded", async () => {
     const searchInput = document.getElementById('busStopSearch');
@@ -15,12 +14,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     const calendarUrl = document.getElementById('calendarUrl');
     const toggleCalendarUrl = document.getElementById('toggleCalendarUrl');
     const copyCalendarUrl = document.getElementById('copyCalendarUrl');
-    
-    // Freeze save button width to prevent sibling shift when label changes
-    if (saveButton) {
-        const initialWidth = saveButton.getBoundingClientRect().width;
-        saveButton.style.width = `${Math.ceil(initialWidth)}px`;
-    }
     
     // Load bus stops data
     await loadBusStops();
@@ -35,6 +28,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     setupSearchInput(searchInput, dropdown, basket);
     
     // Setup calendar URL change detection and character limiting
+    let fullCalendarUrl = '';
+    
     calendarUrl.addEventListener('input', (e) => {
         if (calendarUrl.type === 'password') {
             // Store the full URL
@@ -353,23 +348,16 @@ function addToBasket(code, description, triggerChangeDetection = true) {
     console.log(`Added bus stop ${code} to selections`);
     
     const basket = document.getElementById('selectedBasket');
-    
-    // Remove empty message if it exists
-    const emptyMessage = basket.querySelector('.basket-empty');
-    if (emptyMessage) {
-        emptyMessage.remove();
-    }
-    
     const item = document.createElement('div');
-    item.className = 'selected-item';
+    item.className = 'basket-item';
     item.dataset.code = code;
     
     item.innerHTML = `
-        <span class=\"selected-item-text\">
+        <span class="bus-stop-info">
             <strong>${code}</strong><br>
             <small>${description}</small>
         </span>
-        <button type=\"button\" class=\"remove-item\" aria-label=\"Remove ${code} - ${description}\" title=\"Remove\" onclick=\"removeFromBasket('${code}')\">×</button>
+        <button class="remove-btn" onclick="removeFromBasket('${code}')">×</button>
     `;
     
     basket.appendChild(item);
@@ -389,14 +377,6 @@ function removeFromBasket(code) {
         basket.removeChild(item);
     }
     
-    // Show empty message if no items left
-    if (selectedBusStops.size === 0 && !basket.querySelector('.basket-empty')) {
-        const emptyMessage = document.createElement('p');
-        emptyMessage.className = 'basket-empty';
-        emptyMessage.textContent = 'No bus stops selected. Search and click on a bus stop to add it here.';
-        basket.appendChild(emptyMessage);
-    }
-    
     checkForChanges();
 }
 
@@ -404,7 +384,11 @@ function loadCalendarUrl() {
     const savedUrl = localStorage.getItem('calendarUrl');
     const calendarInput = document.getElementById('calendarUrl');
     if (savedUrl && calendarInput) {
-        fullCalendarUrl = savedUrl; // Set the global variable
+        // Get the fullCalendarUrl variable from the DOMContentLoaded scope
+        // We need to set this properly in the global scope or pass it somehow
+        const event = new CustomEvent('setFullCalendarUrl', { detail: savedUrl });
+        document.dispatchEvent(event);
+        
         calendarInput.value = savedUrl;
         originalCalendarUrl = savedUrl;
         
@@ -422,7 +406,7 @@ function loadCalendarUrl() {
 // Check for any changes (bus stops or calendar URL)
 function checkForChanges() {
     const calendarInput = document.getElementById('calendarUrl');
-    const currentCalendarUrl = calendarInput ? (calendarInput.type === 'password' ? fullCalendarUrl : calendarInput.value.trim()) : '';
+    const currentCalendarUrl = calendarInput ? (calendarInput.type === 'password' ? getFullCalendarUrl() : calendarInput.value.trim()) : '';
     
     // Check if bus stop selections have changed
     const busStopsChanged = selectedBusStops.size !== originalSelections.size || 
@@ -439,17 +423,27 @@ function checkForChanges() {
     }
 }
 
+// Global variable to store the full calendar URL (shared between functions)
+let globalFullCalendarUrl = '';
+
+// Listen for the custom event to set the full calendar URL
+document.addEventListener('setFullCalendarUrl', (e) => {
+    globalFullCalendarUrl = e.detail;
+});
+
+// Function to get the full calendar URL from outside the DOMContentLoaded scope
+function getFullCalendarUrl() {
+    return globalFullCalendarUrl;
+}
+
 async function saveSelections(saveStatus) {
     const saveButton = document.getElementById('saveChanges');
     
     try {
         // Disable button during save
-    const originalLabel = 'Apply Changes';
-    saveButton.disabled = true;
-    saveButton.textContent = 'Saving...';
-    // prepare status container
-    saveStatus.textContent = '';
-    saveStatus.classList.remove('show', 'hide');
+        saveButton.disabled = true;
+        saveButton.textContent = 'Saving...';
+        saveStatus.style.display = 'none';
         
         // Prepare data to save
         const selectionsArray = Array.from(selectedBusStops).map(code => {
@@ -467,7 +461,7 @@ async function saveSelections(saveStatus) {
         // Save calendar URL to localStorage
         const calendarInput = document.getElementById('calendarUrl');
         if (calendarInput) {
-            const calendarUrl = calendarInput.type === 'password' ? fullCalendarUrl : calendarInput.value.trim();
+            const calendarUrl = calendarInput.type === 'password' ? getFullCalendarUrl() : calendarInput.value.trim();
             if (calendarUrl) {
                 localStorage.setItem('calendarUrl', calendarUrl);
             } else {
@@ -499,39 +493,38 @@ async function saveSelections(saveStatus) {
         selectedBusStops.forEach(code => originalSelections.add(code));
         
         // Update original calendar URL
-        originalCalendarUrl = calendarInput.type === 'password' ? fullCalendarUrl : calendarInput.value.trim();
+        originalCalendarUrl = calendarInput.type === 'password' ? getFullCalendarUrl() : calendarInput.value.trim();
         
-        // Show success message with fade-in
+        // Show success message
         saveStatus.textContent = 'Settings saved successfully!';
-        saveStatus.classList.remove('hide');
-        saveStatus.classList.add('show');
+        saveStatus.className = 'save-status success';
+        saveStatus.style.display = 'block';
         
-        // Reset button without layout shift
-        saveButton.textContent = originalLabel;
+        // Reset button
+        saveButton.textContent = 'Save Changes';
         hasChanges = false;
-        checkForChanges(); // disable button since no changes
+        checkForChanges(); // This will disable the button since no changes
         
-        // After 2s visible, fade out over 0.5s
+        // Hide success message after 3 seconds
         setTimeout(() => {
-            saveStatus.classList.remove('show');
-            saveStatus.classList.add('hide');
-        }, 2000);
+            saveStatus.style.display = 'none';
+        }, 3000);
         
     } catch (error) {
         console.error('Save error:', error);
         
-        // Show error message (auto-hide after 3s)
+        // Show error message
         saveStatus.textContent = 'Failed to save settings. Please try again.';
-        saveStatus.classList.remove('hide');
-        saveStatus.classList.add('show');
+        saveStatus.className = 'save-status error';
+        saveStatus.style.display = 'block';
         
         // Reset button
-        saveButton.textContent = originalLabel;
+        saveButton.textContent = 'Save Changes';
         saveButton.disabled = false;
-
+        
+        // Hide error message after 5 seconds
         setTimeout(() => {
-            saveStatus.classList.remove('show');
-            saveStatus.classList.add('hide');
-        }, 3000);
+            saveStatus.style.display = 'none';
+        }, 5000);
     }
 }
