@@ -5,6 +5,7 @@ let originalSelections = new Set(); // Store original selections to track change
 let originalCalendarUrl = ''; // Store original calendar URL to track changes
 let hasChanges = false;
 let fullCalendarUrl = ''; // Global scope for calendar URL
+let favoriteBusStops = new Set(); // Store favorite bus stop codes
 
 document.addEventListener("DOMContentLoaded", async () => {
     const searchInput = document.getElementById('busStopSearch');
@@ -21,6 +22,9 @@ document.addEventListener("DOMContentLoaded", async () => {
         const initialWidth = saveButton.getBoundingClientRect().width;
         saveButton.style.width = `${Math.ceil(initialWidth)}px`;
     }
+    
+    // Load favorites from localStorage
+    loadFavorites();
     
     // Load bus stops data
     await loadBusStops();
@@ -207,12 +211,19 @@ function setupSearchInput(input, dropdown, basket) {
     let selectedIndex = -1;
     let isSelecting = false; // Flag to prevent blur interference
     
+    // Show favorites when input is focused
+    input.addEventListener('focus', () => {
+        selectedIndex = -1;
+        showDropdown(dropdown, [], input, basket, () => { isSelecting = true; });
+    });
+    
     input.addEventListener('input', (e) => {
         const query = e.target.value.toLowerCase().trim();
         selectedIndex = -1;
         
         if (query.length === 0) {
-            hideDropdown(dropdown);
+            // Show favorites when query is empty
+            showDropdown(dropdown, [], input, basket, () => { isSelecting = true; });
             return;
         }
         
@@ -267,48 +278,157 @@ function setupSearchInput(input, dropdown, basket) {
 function showDropdown(dropdown, filteredStops, input, basket, setSelectingCallback) {
     dropdown.innerHTML = '';
     
-    if (filteredStops.length === 0) {
-        const noResults = document.createElement('div');
-        noResults.className = 'no-results';
-        noResults.textContent = 'No bus stops found';
-        dropdown.appendChild(noResults);
-    } else {
-        filteredStops.forEach(stop => {
-            const option = document.createElement('div');
-            option.className = 'search-option';
-            
-            // Show if already selected
-            const isSelected = selectedBusStops.has(stop.BusStopCode);
-            option.textContent = `${stop.BusStopCode} - ${stop.Description}${isSelected ? ' (already selected)' : ''}`;
-            option.dataset.code = stop.BusStopCode;
-            option.dataset.description = stop.Description;
-            
-            console.log('Created option:', { code: option.dataset.code, description: option.dataset.description, stopCode: stop.BusStopCode, stopDesc: stop.Description });
-            
-            if (isSelected) {
-                option.style.opacity = '0.6';
-                option.style.fontStyle = 'italic';
-            }
-            
-            option.addEventListener('mousedown', (e) => {
-                e.preventDefault(); // Prevent blur from happening
-                if (setSelectingCallback) setSelectingCallback();
-                console.log('Option mousedown:', option.dataset.code, option.dataset.description);
-                selectOption(input, dropdown, option, basket);
-            });
-            
-            option.addEventListener('click', (e) => {
-                e.preventDefault(); // Prevent any default behavior
-                if (setSelectingCallback) setSelectingCallback();
-                console.log('Option click:', option.dataset.code, option.dataset.description);
-                selectOption(input, dropdown, option, basket);
-            });
-            
+    const currentQuery = input.value.toLowerCase().trim();
+    
+    // Show favorites section first if we have any
+    const favoriteStops = Array.from(favoriteBusStops)
+        .map(code => allBusStops.find(stop => stop.BusStopCode === code))
+        .filter(stop => stop !== undefined)
+        .sort((a, b) => a.BusStopCode.localeCompare(b.BusStopCode));
+    
+    if (favoriteStops.length > 0) {
+        // Add favorites header
+        const favHeader = document.createElement('div');
+        favHeader.className = 'dropdown-section-header';
+        favHeader.textContent = 'Favorites';
+        dropdown.appendChild(favHeader);
+        
+        // Add favorite stops
+        favoriteStops.forEach(stop => {
+            const option = createSearchOption(stop, input, dropdown, basket, setSelectingCallback);
             dropdown.appendChild(option);
         });
+        
+        // Add divider if we have search results too
+        if (filteredStops.length > 0) {
+            const divider = document.createElement('div');
+            divider.className = 'dropdown-divider';
+            dropdown.appendChild(divider);
+        }
+    }
+    
+    // Show search results
+    if (filteredStops.length === 0 && currentQuery.length > 0) {
+        if (favoriteStops.length === 0) {
+            const noResults = document.createElement('div');
+            noResults.className = 'no-results';
+            noResults.textContent = 'No bus stops found';
+            dropdown.appendChild(noResults);
+        }
+    } else if (filteredStops.length > 0) {
+        // Add search results header if we also have favorites
+        if (favoriteStops.length > 0) {
+            const resultsHeader = document.createElement('div');
+            resultsHeader.className = 'dropdown-section-header';
+            resultsHeader.textContent = 'Search Results';
+            dropdown.appendChild(resultsHeader);
+        }
+        
+        // Filter out favorites from search results to avoid duplicates
+        const nonFavoriteResults = filteredStops.filter(stop => !favoriteBusStops.has(stop.BusStopCode));
+        
+        nonFavoriteResults.forEach(stop => {
+            const option = createSearchOption(stop, input, dropdown, basket, setSelectingCallback);
+            dropdown.appendChild(option);
+        });
+    } else if (favoriteStops.length === 0 && currentQuery.length === 0) {
+        // Show hint when no favorites and no query
+        const hint = document.createElement('div');
+        hint.className = 'no-results';
+        hint.textContent = 'No favorites yet. Type to search bus stops or click stars to add favorites.';
+        dropdown.appendChild(hint);
     }
     
     dropdown.style.display = 'block';
+}
+
+function createSearchOption(stop, input, dropdown, basket, setSelectingCallback) {
+    const option = document.createElement('div');
+    option.className = 'search-option';
+    option.dataset.code = stop.BusStopCode;
+    option.dataset.description = stop.Description;
+    
+    // Create the main content
+    const content = document.createElement('div');
+    content.className = 'option-content';
+    
+    const isSelected = selectedBusStops.has(stop.BusStopCode);
+    content.textContent = `${stop.BusStopCode} - ${stop.Description}${isSelected ? ' (already selected)' : ''}`;
+    
+    if (isSelected) {
+        option.style.opacity = '0.6';
+        option.style.fontStyle = 'italic';
+    }
+    
+    // Create star button
+    const starBtn = document.createElement('button');
+    starBtn.type = 'button';
+    starBtn.className = 'star-btn';
+    const isFavorite = favoriteBusStops.has(stop.BusStopCode);
+    starBtn.innerHTML = isFavorite ? '★' : '☆';
+    starBtn.style.color = isFavorite ? '#fbbf24' : '#9ca3af';
+    starBtn.title = isFavorite ? 'Remove from favorites' : 'Add to favorites';
+    
+    // Star click handler
+    starBtn.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+    });
+    
+    starBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        console.log('Star clicked for bus stop:', stop.BusStopCode);
+        
+        if (setSelectingCallback) setSelectingCallback();
+        
+        toggleFavorite(stop.BusStopCode);
+        
+        console.log('Favorites after toggle:', Array.from(favoriteBusStops));
+        
+        // Update star appearance
+        const nowFavorite = favoriteBusStops.has(stop.BusStopCode);
+        starBtn.innerHTML = nowFavorite ? '★' : '☆';
+        starBtn.style.color = nowFavorite ? '#fbbf24' : '#9ca3af';
+        starBtn.title = nowFavorite ? 'Remove from favorites' : 'Add to favorites';
+        
+        // Refresh dropdown to show updated favorites
+        const query = input.value.toLowerCase().trim();
+        let searchResults = [];
+        if (query.length > 0) {
+            const searchTerms = query.split(/\s+/).filter(term => term.length > 0);
+            searchResults = allBusStops.filter(s => {
+                const searchText = s.searchText;
+                return searchTerms.every(term => searchText.includes(term));
+            }).slice(0, 10);
+        }
+        showDropdown(dropdown, searchResults, input, basket, setSelectingCallback);
+    });
+    
+    // Option click handler - only trigger if not clicking on star
+    option.addEventListener('mousedown', (e) => {
+        if (e.target === starBtn || e.target.closest('.star-btn')) {
+            return; // Don't select option if clicking star
+        }
+        e.preventDefault();
+        if (setSelectingCallback) setSelectingCallback();
+        selectOption(input, dropdown, option, basket);
+    });
+    
+    option.addEventListener('click', (e) => {
+        if (e.target === starBtn || e.target.closest('.star-btn')) {
+            return; // Don't select option if clicking star
+        }
+        e.preventDefault();
+        if (setSelectingCallback) setSelectingCallback();
+        selectOption(input, dropdown, option, basket);
+    });
+    
+    option.appendChild(content);
+    option.appendChild(starBtn);
+    
+    return option;
 }
 
 function updateSelection(options, selectedIndex) {
@@ -534,4 +654,48 @@ async function saveSelections(saveStatus) {
             saveStatus.classList.add('hide');
         }, 3000);
     }
+}
+
+function loadFavorites() {
+    try {
+        const stored = localStorage.getItem('favoriteBusStops');
+        console.log('Loading favorites from localStorage:', stored);
+        if (stored) {
+            const favoriteArray = JSON.parse(stored);
+            favoriteBusStops = new Set(favoriteArray);
+            console.log('Loaded favorites:', Array.from(favoriteBusStops));
+        } else {
+            console.log('No stored favorites found');
+        }
+    } catch (error) {
+        console.error('Error loading favorites:', error);
+        favoriteBusStops = new Set();
+    }
+}
+
+function saveFavorites() {
+    try {
+        const favArray = Array.from(favoriteBusStops);
+        console.log('Saving favorites to localStorage:', favArray);
+        localStorage.setItem('favoriteBusStops', JSON.stringify(favArray));
+        console.log('Favorites saved successfully');
+    } catch (error) {
+        console.error('Error saving favorites:', error);
+    }
+}
+
+function toggleFavorite(busStopCode) {
+    console.log('toggleFavorite called with:', busStopCode);
+    console.log('Current favorites before toggle:', Array.from(favoriteBusStops));
+    
+    if (favoriteBusStops.has(busStopCode)) {
+        favoriteBusStops.delete(busStopCode);
+        console.log('Removed from favorites:', busStopCode);
+    } else {
+        favoriteBusStops.add(busStopCode);
+        console.log('Added to favorites:', busStopCode);
+    }
+    
+    console.log('Current favorites after toggle:', Array.from(favoriteBusStops));
+    saveFavorites();
 }
