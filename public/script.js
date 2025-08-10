@@ -582,11 +582,21 @@ async function loadTodayCalendarSnippet() {
         
         const todayEvents = filterTodayEvents(events);
         console.log('Today events:', todayEvents.length);
-        
-        if (todayEvents.length > 0) {
-            displayTodaySnippet(todayEvents);
+
+        // Also get the earliest event for tomorrow
+        const tomorrowEvent = getEarliestTomorrowEvent(events);
+        console.log('Tomorrow earliest event:', tomorrowEvent ? tomorrowEvent.summary : 'None');
+
+        // Build display list with up to 3 rows total
+        const displayEvents = todayEvents.slice(0, 3).map(e => ({ ...e, __isTomorrow: false }));
+        if (displayEvents.length < 3 && tomorrowEvent) {
+            displayEvents.push({ ...tomorrowEvent, __isTomorrow: true });
+        }
+
+        if (displayEvents.length > 0) {
+            displayTodaySnippet(displayEvents);
         } else {
-            // Hide snippet if no events today
+            // Hide snippet if neither today nor tomorrow has events
             container.classList.remove('has-events');
             container.style.display = 'none';
         }
@@ -709,6 +719,23 @@ function filterTodayEvents(events) {
         .slice(0, 3); // Limit to 3 events for snippet
 }
 
+// Get the earliest event for tomorrow (if any)
+function getEarliestTomorrowEvent(events) {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const tomorrow = new Date(today.getTime() + 24 * 60 * 60 * 1000);
+
+    const tomorrowEvents = events
+        .filter(event => {
+            if (!event.dtstart) return false;
+            const eventDate = new Date(event.dtstart.getFullYear(), event.dtstart.getMonth(), event.dtstart.getDate());
+            return eventDate.getTime() === tomorrow.getTime();
+        })
+        .sort((a, b) => a.dtstart - b.dtstart);
+
+    return tomorrowEvents.length > 0 ? tomorrowEvents[0] : null;
+}
+
 // Filter events for upcoming week
 function filterUpcomingEvents(events) {
     const now = new Date();
@@ -747,11 +774,15 @@ function displayTodaySnippet(events) {
             hour12: true 
         }) : '';
         
-        const timeStr = endTime ? `${startTimeStr} - ${endTimeStr}` : startTimeStr;
+        let timeStr = endTime ? `${startTimeStr} - ${endTimeStr}` : startTimeStr;
+        // Append suffix for tomorrow entries
+        if (event.__isTomorrow) {
+            timeStr += ' tomorrow';
+        }
         
         html += `
             <div class="today-snippet-event">
-                <div class="today-snippet-time">${timeStr}</div>
+                <div class="today-snippet-time${event.__isTomorrow ? ' tomorrow' : ''}">${timeStr}</div>
                 <div class="today-snippet-title">${escapeHtml(event.summary)}</div>
             </div>
         `;

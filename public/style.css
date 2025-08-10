@@ -163,6 +163,11 @@ body {
     font-size: 0.85em;
 }
 
+/* Tomorrow variant: slightly darker grey to reduce contrast on dark background */
+.today-snippet-time.tomorrow {
+    color: #9a9a9a;
+}
+
 .today-snippet-title {
     color: #ffffff;
     flex: 1;
