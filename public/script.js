@@ -587,8 +587,8 @@ async function loadTodayCalendarSnippet() {
         const tomorrowEvents = getTomorrowEvents(events);
         console.log('Tomorrow events:', tomorrowEvents.length);
 
-        // Build display list: up to 3 from today, then all of tomorrow's
-        let displayEvents = todayEvents.slice(0, 3).map(e => ({ ...e, __isTomorrow: false }));
+    // Build display list: all of today's (upcoming), then all of tomorrow's
+    let displayEvents = todayEvents.map(e => ({ ...e, __isTomorrow: false }));
         if (tomorrowEvents.length > 0) {
             displayEvents = displayEvents.concat(tomorrowEvents.map(e => ({ ...e, __isTomorrow: true })));
         }
@@ -715,8 +715,7 @@ function filterTodayEvents(events) {
             const eventDate = new Date(event.dtstart.getFullYear(), event.dtstart.getMonth(), event.dtstart.getDate());
             return eventDate.getTime() === today.getTime() && event.dtstart >= now;
         })
-        .sort((a, b) => a.dtstart - b.dtstart)
-        .slice(0, 3); // Limit to 3 events for snippet
+    .sort((a, b) => a.dtstart - b.dtstart); // No limit; show all with scroll limiting height
 }
 
 // Get all events for tomorrow (sorted ascending)
