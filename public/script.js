@@ -583,14 +583,14 @@ async function loadTodayCalendarSnippet() {
         const todayEvents = filterTodayEvents(events);
         console.log('Today events:', todayEvents.length);
 
-        // Also get the earliest event for tomorrow
-        const tomorrowEvent = getEarliestTomorrowEvent(events);
-        console.log('Tomorrow earliest event:', tomorrowEvent ? tomorrowEvent.summary : 'None');
+        // Also get all events for tomorrow (sorted)
+        const tomorrowEvents = getTomorrowEvents(events);
+        console.log('Tomorrow events:', tomorrowEvents.length);
 
-        // Build display list with up to 3 rows total
-        const displayEvents = todayEvents.slice(0, 3).map(e => ({ ...e, __isTomorrow: false }));
-        if (displayEvents.length < 3 && tomorrowEvent) {
-            displayEvents.push({ ...tomorrowEvent, __isTomorrow: true });
+        // Build display list: up to 3 from today, then all of tomorrow's
+        let displayEvents = todayEvents.slice(0, 3).map(e => ({ ...e, __isTomorrow: false }));
+        if (tomorrowEvents.length > 0) {
+            displayEvents = displayEvents.concat(tomorrowEvents.map(e => ({ ...e, __isTomorrow: true })));
         }
 
         if (displayEvents.length > 0) {
@@ -719,21 +719,19 @@ function filterTodayEvents(events) {
         .slice(0, 3); // Limit to 3 events for snippet
 }
 
-// Get the earliest event for tomorrow (if any)
-function getEarliestTomorrowEvent(events) {
+// Get all events for tomorrow (sorted ascending)
+function getTomorrowEvents(events) {
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const tomorrow = new Date(today.getTime() + 24 * 60 * 60 * 1000);
 
-    const tomorrowEvents = events
+    return events
         .filter(event => {
             if (!event.dtstart) return false;
             const eventDate = new Date(event.dtstart.getFullYear(), event.dtstart.getMonth(), event.dtstart.getDate());
             return eventDate.getTime() === tomorrow.getTime();
         })
         .sort((a, b) => a.dtstart - b.dtstart);
-
-    return tomorrowEvents.length > 0 ? tomorrowEvents[0] : null;
 }
 
 // Filter events for upcoming week
