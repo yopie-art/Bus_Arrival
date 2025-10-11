@@ -39,6 +39,7 @@ async function loadSelectedBusStops() {
 
 // Initialize the page
 async function init() {
+    startLiveClock();
     await loadSelectedBusStops();
     
     if (selectedBusStops.length === 0) {
@@ -72,6 +73,22 @@ function showNoSelectionsMessage() {
 function hideNoSelectionsMessage() {
     document.getElementById('main-bus-times').style.display = 'block';
     document.getElementById('no-selections').style.display = 'none';
+}
+
+function startLiveClock() {
+    const clockEl = document.getElementById('live-clock');
+    if (!clockEl) return;
+
+    const updateClock = () => {
+        const now = new Date();
+        const hours = String(now.getHours()).padStart(2, '0');
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        const seconds = String(now.getSeconds()).padStart(2, '0');
+        clockEl.textContent = `${hours}:${minutes}:${seconds}`;
+    };
+
+    updateClock();
+    setInterval(updateClock, 1000);
 }
 
 async function initializeTable() {
