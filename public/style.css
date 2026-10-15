@@ -221,7 +221,7 @@ body {
     opacity: 0;
     visibility: hidden;
     pointer-events: none;
-    transition: opacity 3s ease, visibility 3s;
+    transition: opacity 5s ease, visibility 5s;
 }
 .environment-view.is-active {
     opacity: 1;

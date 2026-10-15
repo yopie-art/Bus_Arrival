@@ -1,6 +1,6 @@
 /* Three views share the existing header footprint. Data requests never block rotation. */
 (function () {
-    const VIEW_MS = 12000;
+    const VIEW_MS = 30000;
     const REFRESH_MS = 30 * 60 * 1000;
     const RETRY_MS = 5 * 60 * 1000;
     let started = false;

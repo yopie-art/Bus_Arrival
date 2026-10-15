@@ -53,19 +53,19 @@ function harness({ configured = true, fail = false, partial = false } = {}) {
     };
 }
 
-test('three views rotate at twelve seconds and hidden panels are inaccessible', async () => {
+test('three views rotate at thirty seconds and hidden panels are inaccessible', async () => {
     const h = harness();
     await h.start();
     assert.equal(h.active(), 'headerWeather');
-    await h.advance(11999);
+    await h.advance(29999);
     assert.equal(h.active(), 'headerWeather');
     await h.advance(1);
     assert.equal(h.active(), 'pm25Forecast');
     assert.equal(h.nodes[0].attrs['aria-hidden'], 'true');
     assert.equal(h.nodes[0].inert, true);
-    await h.advance(12000);
+    await h.advance(30000);
     assert.equal(h.active(), 'temperatureForecast');
-    await h.advance(12000);
+    await h.advance(30000);
     assert.equal(h.active(), 'headerWeather');
     assert.equal(h.requests(), 1);
 });
@@ -73,7 +73,7 @@ test('three views rotate at twelve seconds and hidden panels are inaccessible', 
 test('no URL means weather only and no external requests', async () => {
     const h = harness({ configured: false });
     await h.start();
-    await h.advance(12000);
+    await h.advance(30000);
     assert.equal(h.active(), 'headerWeather');
     assert.equal(h.requests(), 0);
 });
@@ -81,33 +81,33 @@ test('no URL means weather only and no external requests', async () => {
 test('partial data skips PM2.5 and still rotates temperature', async () => {
     const h = harness({ partial: true });
     await h.start();
-    await h.advance(12000);
+    await h.advance(30000);
     assert.equal(h.active(), 'temperatureForecast');
-    await h.advance(12000);
+    await h.advance(30000);
     assert.equal(h.active(), 'headerWeather');
 });
 
 test('initial failure falls back to weather, retries and recovers', async () => {
     const h = harness({ fail: true });
     await h.start();
-    await h.advance(12000);
+    await h.advance(30000);
     assert.equal(h.active(), 'headerWeather');
     h.setFailure(false);
     await h.advance(5 * 60000);
     assert.equal(h.requests(), 2);
-    await h.advance(12000);
+    await h.advance(30000);
     assert.equal(h.active(), 'pm25Forecast');
 });
 
 test('midnight removes yesterday data even when the next request fails', async () => {
     const h = harness();
     await h.start();
-    await h.advance(12000);
+    await h.advance(30000);
     assert.equal(h.active(), 'pm25Forecast');
     h.setFailure(true);
     await h.advance(12 * 3600000);
     assert.equal(h.active(), 'headerWeather');
-    await h.advance(12000);
+    await h.advance(30000);
     assert.equal(h.active(), 'headerWeather');
 });
 
@@ -117,7 +117,7 @@ test('late responses cannot restore forecasts after the URL is cleared', async (
     await h.start();
     await h.clear();
     await h.resolve();
-    await h.advance(12000);
+    await h.advance(30000);
     assert.equal(h.active(), 'headerWeather');
 });
 
@@ -126,7 +126,7 @@ test('failed refresh retains current-day data, then expires old model runs', asy
     await h.start();
     h.setFailure(true);
     await h.advance(30 * 60000);
-    await h.advance(12000);
+    await h.advance(30000);
     assert.equal(h.active(), 'temperatureForecast');
     const tomorrow = '2026-10-19T12:00:00+08:00';
     h.response.pm25.points = [{ time: tomorrow, value: 50 }];
