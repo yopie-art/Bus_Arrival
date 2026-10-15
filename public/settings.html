@@ -388,6 +388,21 @@
             </div>
         </div>
 
+        <div class="settings-section">
+            <h2>Air Quality &amp; Temperature Forecast (Optional)</h2>
+            <p class="forecast-settings-help" id="aqicnHelp">
+                Enter an AQICN forecast or station URL, such as https://aqicn.org/city/singapore/west/.
+                Today's PM2.5 and temperature charts will
+                rotate with the weather icons every 12 seconds. Leave blank to show weather only.
+                This setting is saved in this browser on this device.
+            </p>
+            <label for="aqicnForecastUrl">AQICN forecast or station URL</label>
+            <input type="url" id="aqicnForecastUrl" class="search-input" maxlength="300"
+                placeholder="https://aqicn.org/forecast/singapore/" aria-describedby="aqicnHelp aqicnStatus">
+            <button type="button" id="checkAqicnForecast" class="forecast-check-button">Check forecast</button>
+            <p id="aqicnStatus" class="forecast-settings-help" role="status"></p>
+        </div>
+
         <div class="settings-actions">
                 <div class="save-group">
                     <button id="saveChanges" class="save-button" disabled>Apply Changes</button>
@@ -399,6 +414,7 @@
             </div>
     </div>
 
+    <script src="aqicn-shared.js"></script>
     <script src="settings.js"></script>
 </body>
 </html>

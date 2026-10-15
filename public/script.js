@@ -40,6 +40,8 @@ async function loadSelectedBusStops() {
 // Initialize the page
 async function init() {
     startLiveClock();
+    // Forecast loading is independent of bus and weather requests.
+    window.DashboardEnvironment.start();
     await loadSelectedBusStops();
     
     if (selectedBusStops.length === 0) {
@@ -152,6 +154,7 @@ function buildTableStructure() {
         services.forEach((busNo, serviceIndex) => {
             const row = document.createElement('tr');
             row.id = `row-${busStop.code}-${busNo}`;
+            row.className = 'bus-service-row';
             
             if (serviceIndex === 0) {
                 // First row for this bus stop - add the merged bus stop cell

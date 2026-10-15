@@ -99,6 +99,24 @@ app.use(express.static(path.join(__dirname, 'public')));
 // Serve weather images from Weather_Images directory
 app.use('/Weather_Images', express.static(path.join(__dirname, 'Weather_Images')));
 
+const { fetchForecast } = require('./aqicn');
+const { normalizeUrl: normalizeAqicnUrl } = require('./public/aqicn-shared');
+
+app.get('/aqicn-forecast', async (req, res) => {
+    res.set('Cache-Control', 'no-store');
+    try {
+        normalizeAqicnUrl(req.query.url);
+    } catch (error) {
+        return res.status(400).json({ error: error.message });
+    }
+    try {
+        res.json(await fetchForecast(req.query.url, fetch));
+    } catch (error) {
+        console.warn('AQICN forecast unavailable:', error.message);
+        res.status(502).json({ error: 'AQICN forecast is temporarily unavailable. Weather will continue to display.' });
+    }
+});
+
 // In-memory storage for bus stop selections (in production, you'd use a database)
 let busStopSelections = [];
 

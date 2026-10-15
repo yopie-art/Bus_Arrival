@@ -19,8 +19,12 @@
                     <!-- Today's events will be dynamically populated -->
                 </div>
             </div>
-            <div class="header-weather" id="headerWeather">
-                <!-- Weather icons will be dynamically populated -->
+            <div class="header-environment" id="headerEnvironment" aria-label="Today's weather and forecasts">
+                <div class="header-weather environment-view is-active" id="headerWeather" aria-hidden="false">
+                    <!-- Weather icons will be dynamically populated -->
+                </div>
+                <div class="environment-view forecast-view" id="pm25Forecast" aria-hidden="true"></div>
+                <div class="environment-view forecast-view" id="temperatureForecast" aria-hidden="true"></div>
             </div>
         </div>
         
@@ -90,6 +94,8 @@
     <!-- Settings link in bottom right corner -->
     <a href="settings.html" class="settings-link">⚙️ Settings</a>
     
+    <script src="aqicn-shared.js"></script>
+    <script src="environment.js"></script>
     <script src="script.js"></script>
 </body>
 </html>

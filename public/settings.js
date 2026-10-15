@@ -6,6 +6,7 @@ let originalCalendarUrl = ''; // Store original calendar URL to track changes
 let hasChanges = false;
 let fullCalendarUrl = ''; // Global scope for calendar URL
 let favoriteBusStops = new Set(); // Store favorite bus stop codes
+let originalAqicnUrl = '';
 
 document.addEventListener("DOMContentLoaded", async () => {
     const searchInput = document.getElementById('busStopSearch');
@@ -34,6 +35,15 @@ document.addEventListener("DOMContentLoaded", async () => {
     
     // Load existing calendar URL
     loadCalendarUrl();
+    const aqicnInput = document.getElementById('aqicnForecastUrl');
+    originalAqicnUrl = localStorage.getItem('aqicnForecastUrl') || '';
+    aqicnInput.value = originalAqicnUrl;
+    aqicnInput.addEventListener('input', () => {
+        document.getElementById('aqicnStatus').textContent = '';
+        aqicnInput.removeAttribute('aria-invalid');
+        checkForChanges();
+    });
+    document.getElementById('checkAqicnForecast').addEventListener('click', checkAqicnForecast);
     
     // Setup search functionality
     setupSearchInput(searchInput, dropdown, basket);
@@ -539,6 +549,35 @@ function loadCalendarUrl() {
     }
 }
 
+async function checkAqicnForecast() {
+    const input = document.getElementById('aqicnForecastUrl');
+    const status = document.getElementById('aqicnStatus');
+    const button = document.getElementById('checkAqicnForecast');
+    const originalValue = input.value;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 12000);
+    button.disabled = true;
+    status.textContent = 'Checking today\'s forecast…';
+    try {
+        const url = Aqicn.normalizeUrl(input.value.trim());
+        const response = await fetch(`/aqicn-forecast?url=${encodeURIComponent(url)}`, { signal: controller.signal, cache: 'no-store' });
+        if (!response.ok) throw new Error('Forecast unavailable. Weather will still display; the dashboard will retry automatically.');
+        const data = await response.json();
+        const pmHours = Aqicn.todaySlots(data.pm25).filter(value => value !== null).length;
+        const tempHours = Aqicn.todaySlots(data.temperature).filter(value => value !== null).length;
+        if (input.value !== originalValue) return;
+        status.textContent = pmHours || tempHours
+            ? `${data.location}: PM2.5 ${pmHours}/24 hours; temperature ${tempHours}/24 hours today (Singapore time).`
+            : 'No fresh forecast for today. Weather will display while the dashboard retries.';
+    } catch (error) {
+        if (input.value === originalValue) status.textContent = error.name === 'AbortError'
+            ? 'The forecast check timed out. Weather will continue to display.' : error.message;
+    } finally {
+        clearTimeout(timeout);
+        button.disabled = false;
+    }
+}
+
 // Check for any changes (bus stops or calendar URL)
 function checkForChanges() {
     const calendarInput = document.getElementById('calendarUrl');
@@ -551,7 +590,8 @@ function checkForChanges() {
     // Check if calendar URL has changed
     const calendarChanged = currentCalendarUrl !== originalCalendarUrl;
     
-    hasChanges = busStopsChanged || calendarChanged;
+    const aqicnChanged = document.getElementById('aqicnForecastUrl').value.trim() !== originalAqicnUrl;
+    hasChanges = busStopsChanged || calendarChanged || aqicnChanged;
     
     const saveButton = document.getElementById('saveChanges');
     if (saveButton) {
@@ -561,6 +601,16 @@ function checkForChanges() {
 
 async function saveSelections(saveStatus) {
     const saveButton = document.getElementById('saveChanges');
+    const aqicnInput = document.getElementById('aqicnForecastUrl');
+    let aqicnUrl = aqicnInput.value.trim();
+    try {
+        if (aqicnUrl) aqicnUrl = Aqicn.normalizeUrl(aqicnUrl);
+    } catch (error) {
+        document.getElementById('aqicnStatus').textContent = error.message;
+        aqicnInput.setAttribute('aria-invalid', 'true');
+        aqicnInput.focus();
+        return;
+    }
     
     try {
         // Disable button during save
@@ -583,6 +633,8 @@ async function saveSelections(saveStatus) {
         
         // Save to localStorage (primary storage)
         localStorage.setItem('busStopSelections', JSON.stringify(selectionsArray));
+        if (aqicnUrl) localStorage.setItem('aqicnForecastUrl', aqicnUrl);
+        else localStorage.removeItem('aqicnForecastUrl');
         
         // Save calendar URL to localStorage
         const calendarInput = document.getElementById('calendarUrl');
@@ -620,6 +672,8 @@ async function saveSelections(saveStatus) {
         
         // Update original calendar URL
         originalCalendarUrl = calendarInput.type === 'password' ? fullCalendarUrl : calendarInput.value.trim();
+        originalAqicnUrl = aqicnUrl;
+        aqicnInput.value = aqicnUrl;
         
         // Show success message with fade-in
         saveStatus.textContent = 'Settings saved successfully!';
