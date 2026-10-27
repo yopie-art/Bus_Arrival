@@ -6,33 +6,8 @@ let majorityRegion = null; // Store the majority region for weather highlighting
 // Load selected bus stops from settings
 async function loadSelectedBusStops() {
     try {
-        // First try to load from localStorage
-        const localSelections = localStorage.getItem('busStopSelections');
-        if (localSelections) {
-            selectedBusStops = JSON.parse(localSelections);
-            if (Array.isArray(selectedBusStops) && selectedBusStops.length > 0) {
-                console.log('Loaded selected bus stops from localStorage:', selectedBusStops);
-                return;
-            }
-        }
-        
-        // Fallback: try to load from backend (for migration purposes)
-        const response = await fetch('/bus-stop-selections');
-        if (response.ok) {
-            selectedBusStops = await response.json();
-            if (Array.isArray(selectedBusStops) && selectedBusStops.length > 0) {
-                // Migrate to localStorage
-                localStorage.setItem('busStopSelections', JSON.stringify(selectedBusStops));
-                console.log('Migrated selected bus stops from backend to localStorage');
-                return;
-            }
-        }
-        
-        // No selections found
-        selectedBusStops = [];
-        
-    } catch (error) {
-        console.error('Error loading selected bus stops:', error);
+        selectedBusStops = ClientSafety.sanitizeBusStops(JSON.parse(localStorage.getItem('busStopSelections') || '[]'));
+    } catch {
         selectedBusStops = [];
     }
 }
@@ -100,7 +75,7 @@ async function initializeTable() {
             const response = await fetch(`/bus-arrival?BusStopCode=${busStop.code}`);
             const data = await response.json();
             const availableServices = data.Services || [];
-            const serviceNumbers = availableServices.map(s => s.ServiceNo).sort((a, b) => {
+            const serviceNumbers = availableServices.map(s => s.ServiceNo).filter(value => typeof value === 'string' && /^[A-Za-z0-9]{1,8}$/.test(value)).sort((a, b) => {
                 // Sort numerically, then alphabetically
                 const aNum = parseInt(a);
                 const bNum = parseInt(b);
@@ -123,59 +98,56 @@ async function initializeTable() {
 function buildTableStructure() {
     const tableBody = document.querySelector('#mainTable tbody');
     if (!tableBody) return;
-    
-    tableBody.innerHTML = '';
-    
-    selectedBusStops.forEach((busStop, stopIndex) => {
-        const services = busStopServices[busStop.code] || [];
-        
-        // Add a separator row between bus stop groups (except for the first one)
+    tableBody.replaceChildren();
+    function stopCell(stop, span = 1) {
+        const cell = document.createElement('td');
+        cell.className = 'bus-stop-cell';
+        cell.rowSpan = span;
+        for (const [name, text] of [['bus-stop-code', stop.code], ['bus-stop-desc', stop.description]]) {
+            const label = document.createElement('span');
+            label.className = name;
+            label.textContent = text;
+            cell.appendChild(label);
+        }
+        return cell;
+    }
+    selectedBusStops.forEach((stop, stopIndex) => {
+        const services = busStopServices[stop.code] || [];
         if (stopIndex > 0) {
-            const separatorRow = document.createElement('tr');
-            separatorRow.className = 'bus-stop-separator';
-            separatorRow.innerHTML = `<td colspan="5" class="bus-stop-separator-cell"></td>`;
-            tableBody.appendChild(separatorRow);
+            const separator = document.createElement('tr');
+            separator.className = 'bus-stop-separator';
+            const cell = document.createElement('td');
+            cell.colSpan = 5;
+            cell.className = 'bus-stop-separator-cell';
+            separator.appendChild(cell);
+            tableBody.appendChild(separator);
         }
-        
-        if (services.length === 0) {
-            // Create a single row for bus stops with no services
+        if (!services.length) {
             const row = document.createElement('tr');
-            row.innerHTML = `
-                <td class="bus-stop-cell">
-                    <span class="bus-stop-code">${busStop.code}</span>
-                    <span class="bus-stop-desc">${busStop.description}</span>
-                </td>
-                <td colspan="4" style="font-style: italic; color: #888;">No bus services available</td>
-            `;
+            row.appendChild(stopCell(stop));
+            const cell = document.createElement('td');
+            cell.colSpan = 4;
+            cell.style.fontStyle = 'italic';
+            cell.style.color = '#888';
+            cell.textContent = 'No bus services available';
+            row.appendChild(cell);
             tableBody.appendChild(row);
-            return;
         }
-        
-        services.forEach((busNo, serviceIndex) => {
+        services.forEach((busNo, index) => {
             const row = document.createElement('tr');
-            row.id = `row-${busStop.code}-${busNo}`;
+            row.id = `row-${stop.code}-${busNo}`;
             row.className = 'bus-service-row';
-            
-            if (serviceIndex === 0) {
-                // First row for this bus stop - add the merged bus stop cell
-                const busStopCell = document.createElement('td');
-                busStopCell.className = 'bus-stop-cell';
-                busStopCell.rowSpan = services.length;
-                busStopCell.innerHTML = `
-                    <span class="bus-stop-code">${busStop.code}</span>
-                    <span class="bus-stop-desc">${busStop.description}</span>
-                `;
-                row.appendChild(busStopCell);
+            if (!index) row.appendChild(stopCell(stop, services.length));
+            const number = document.createElement('td');
+            number.textContent = busNo;
+            row.appendChild(number);
+            for (let i = 1; i <= 3; i++) {
+                const arrival = document.createElement('td');
+                arrival.className = 'arrival arrival-cell';
+                arrival.id = `bus-${stop.code}-${busNo}-${i}`;
+                arrival.textContent = 'Loading...';
+                row.appendChild(arrival);
             }
-            
-            // Add bus number and arrival time cells
-            row.innerHTML += `
-                <td>${busNo}</td>
-                <td class="arrival arrival-cell" id="bus-${busStop.code}-${busNo}-1">Loading...</td>
-                <td class="arrival arrival-cell" id="bus-${busStop.code}-${busNo}-2">Loading...</td>
-                <td class="arrival arrival-cell" id="bus-${busStop.code}-${busNo}-3">Loading...</td>
-            `;
-            
             tableBody.appendChild(row);
         });
     });
@@ -191,6 +163,7 @@ function fetchBusTimes() {
                 // Update arrival times for each service
                 availableServices.forEach(service => {
                     const busNo = service.ServiceNo;
+                    if (typeof busNo !== 'string' || !/^[A-Za-z0-9]{1,8}$/.test(busNo)) return;
                     
                     for (let i = 1; i <= 3; i++) {
                         const elemId = `bus-${busStop.code}-${busNo}-${i}`;
@@ -398,7 +371,7 @@ function updateFourDayWeatherTable(forecasts) {
             const date = new Date(forecast.timestamp);
             const dayName = forecast.day.slice(0, 3); // Mon, Tue, etc.
             const dayMonth = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-            headerHTML += `<th>${dayName}<br><small>${dayMonth}</small></th>`;
+            headerHTML += `<th>${escapeHtml(dayName)}<br><small>${escapeHtml(dayMonth)}</small></th>`;
         }
     });
     tableHead.innerHTML = headerHTML;
@@ -413,7 +386,7 @@ function updateFourDayWeatherTable(forecasts) {
         const summary = forecast.forecast?.summary || 'N/A';
         summaryRow.innerHTML += `<td class="weather-cell">
             <div style="font-size: 1.1em; text-align: center; color: #ffffff; line-height: 1.3; font-weight: 500; word-wrap: break-word; white-space: normal; padding: 4px 2px;">
-                ${summary}
+                ${escapeHtml(summary)}
             </div>
         </td>`;
     });
@@ -435,8 +408,8 @@ function updateFourDayWeatherTable(forecasts) {
         const tempLow = forecast.temperature?.low || '-';
         const tempHigh = forecast.temperature?.high || '-';
         tempRow.innerHTML += `<td class="weather-cell">
-            <div style="font-weight: bold; color: #ff6b6b; font-size: 0.9em;">${tempHigh}°C</div>
-            <div style="font-weight: bold; color: #60a5fa; font-size: 0.9em;">${tempLow}°C</div>
+            <div style="font-weight: bold; color: #ff6b6b; font-size: 0.9em;">${escapeHtml(tempHigh)}°C</div>
+            <div style="font-weight: bold; color: #60a5fa; font-size: 0.9em;">${escapeHtml(tempLow)}°C</div>
             <div style="font-size: 0.7em; color: #888;">High / Low</div>
         </td>`;
     });
@@ -449,8 +422,8 @@ function updateFourDayWeatherTable(forecasts) {
         const humidityLow = forecast.relativeHumidity?.low || '-';
         const humidityHigh = forecast.relativeHumidity?.high || '-';
         humidityRow.innerHTML += `<td class="weather-cell">
-            <div style="font-weight: bold;">${humidityHigh}%</div>
-            <div style="font-size: 0.8em; color: #888;">${humidityLow}%</div>
+            <div style="font-weight: bold;">${escapeHtml(humidityHigh)}%</div>
+            <div style="font-size: 0.8em; color: #888;">${escapeHtml(humidityLow)}%</div>
             <div style="font-size: 0.7em; color: #888;">High / Low</div>
         </td>`;
     });
@@ -474,11 +447,11 @@ function getWeatherImageForFourDay(weatherText) {
     }
     
     // Map weather text to image filename - for 4-day forecast we use the main weather directory
-    const imagePath = `../Weather_Images/${weatherText}.png`;
+    const imagePath = `../Weather_Images/${encodeURIComponent(weatherText)}.png`;
     
     return `<div class="weather-icon-container">
-                <img src="${imagePath}" alt="${weatherText}" class="weather-icon" title="${weatherText}" onerror="this.style.display='none'; this.nextElementSibling.style.color='#ff6b6b';" />
-                <span class="weather-text">${weatherText}</span>
+                <img src="${imagePath}" alt="${escapeHtml(weatherText)}" class="weather-icon" title="${escapeHtml(weatherText)}" />
+                <span class="weather-text">${escapeHtml(weatherText)}</span>
             </div>`;
 }
 
@@ -488,11 +461,11 @@ function getWeatherImage(weatherText) {
     }
     
     // Map weather text to image filename
-    const imagePath = `Weather_Images/${weatherText}.png`;
+    const imagePath = `Weather_Images/${encodeURIComponent(weatherText)}.png`;
     
     return `<div class="weather-icon-container">
-                <img src="${imagePath}" alt="${weatherText}" class="weather-icon" title="${weatherText}" />
-                <span class="weather-text">${weatherText}</span>
+                <img src="${imagePath}" alt="${escapeHtml(weatherText)}" class="weather-icon" title="${escapeHtml(weatherText)}" />
+                <span class="weather-text">${escapeHtml(weatherText)}</span>
             </div>`;
 }
 
@@ -584,11 +557,12 @@ async function loadTodayCalendarSnippet() {
     }
     
     try {
-        console.log('Attempting to fetch calendar from:', calendarUrl);
-        
-        // Use server-side proxy to avoid CORS issues
-        const proxyUrl = `/calendar-proxy?url=${encodeURIComponent(calendarUrl)}`;
-        const response = await fetch(proxyUrl);
+        // Use a POST body so the private address never appears in the request URL.
+        const response = await fetch('/calendar-proxy', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url: calendarUrl }), cache: 'no-store',
+            signal: AbortSignal.timeout(12000)
+        });
         
         if (!response.ok) {
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -829,11 +803,12 @@ async function loadCalendarEvents() {
     container.innerHTML = '<div class="calendar-loading">Loading calendar events...</div>';
     
     try {
-        console.log('Attempting to fetch full calendar from:', calendarUrl);
-        
-        // Use server-side proxy to avoid CORS issues
-        const proxyUrl = `/calendar-proxy?url=${encodeURIComponent(calendarUrl)}`;
-        const response = await fetch(proxyUrl);
+        // Use a POST body so the private address never appears in the request URL.
+        const response = await fetch('/calendar-proxy', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url: calendarUrl }), cache: 'no-store',
+            signal: AbortSignal.timeout(12000)
+        });
         
         if (!response.ok) {
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -944,10 +919,17 @@ function formatEventTime(startTime, endTime) {
 
 // Escape HTML to prevent XSS
 function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
+    return ClientSafety.escapeHtml(text);
 }
+
+// Image fallback uses an event listener so script-src can block inline handlers.
+document.addEventListener('error', event => {
+    const image = event.target;
+    if (image.tagName === 'IMG' && image.classList.contains('weather-icon')) {
+        image.style.display = 'none';
+        if (image.nextElementSibling) image.nextElementSibling.style.color = '#ff6b6b';
+    }
+}, true);
 
 // Update header weather icons for majority region
 function updateHeaderWeather(periods) {
@@ -978,10 +960,10 @@ function updateHeaderWeather(periods) {
         weatherItem.className = 'header-weather-item';
         
         weatherItem.innerHTML = `
-            <div class="header-weather-period">${timePeriodText}</div>
+            <div class="header-weather-period">${escapeHtml(timePeriodText)}</div>
             <div class="header-weather-icon-container">
-                <img src="Weather_Images/${regionWeather.text}.png" alt="${regionWeather.text}" class="header-weather-icon" />
-                <div class="header-weather-text">${regionWeather.text}</div>
+                <img src="Weather_Images/${encodeURIComponent(regionWeather.text)}.png" alt="${escapeHtml(regionWeather.text)}" class="header-weather-icon" />
+                <div class="header-weather-text">${escapeHtml(regionWeather.text)}</div>
             </div>
         `;
         

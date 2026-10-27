@@ -84,10 +84,12 @@ async function fetchForecast(value, fetchImpl) {
     try {
         async function read(requestUrl, accept) {
             const response = await fetchImpl(requestUrl, {
-                signal: controller.signal, redirect: 'error', size: 2 * 1024 * 1024,
-                headers: { Accept: accept }
+                signal: controller.signal, redirect: 'error', size: 2 * 1024 * 1024, compress: false,
+                headers: { Accept: accept, 'Accept-Encoding': 'identity' }
             });
             if (!response.ok) throw new Error(`AQICN returned HTTP ${response.status}.`);
+            const encoding = response.headers?.get('content-encoding');
+            if (encoding && encoding.toLowerCase() !== 'identity') throw new Error('Compressed forecast responses are not accepted.');
             const text = await response.text();
             if (Buffer.byteLength(text) > 2 * 1024 * 1024) throw new Error('AQICN response is too large.');
             return text;

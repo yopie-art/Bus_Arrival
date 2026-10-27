@@ -1,5 +1,7 @@
 # Environment variables (contains secret calendar URL)
 .env
+.env.*
+!.env.example
 
 # Node modules
 node_modules/

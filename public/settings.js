@@ -182,38 +182,14 @@ async function loadBusStops() {
 
 async function loadExistingSelections() {
     try {
-        // First try to load from localStorage
-        const localSelections = localStorage.getItem('busStopSelections');
-        if (localSelections) {
-            const selections = JSON.parse(localSelections);
-            if (Array.isArray(selections) && selections.length > 0) {
-                selections.forEach(selection => {
-                    if (selection.code && selection.description) {
-                        addToBasket(selection.code, selection.description, false); // Don't trigger change detection
-                        originalSelections.add(selection.code); // Track original selections
-                    }
-                });
-                console.log(`Loaded ${selections.length} existing selections from localStorage`);
-                return;
-            }
-        }
-
-        // If no localStorage data, try to fetch from backend
-        const response = await fetch('/bus-stop-selections');
-        if (response.ok) {
-            const selections = await response.json();
-            if (Array.isArray(selections) && selections.length > 0) {
-                selections.forEach(selection => {
-                    if (selection.code && selection.description) {
-                        addToBasket(selection.code, selection.description, false); // Don't trigger change detection
-                        originalSelections.add(selection.code); // Track original selections
-                    }
-                });
-                console.log(`Loaded ${selections.length} existing selections from backend`);
-            }
-        }
-    } catch (error) {
-        console.log('No existing selections found or error loading them');
+        const selections = ClientSafety.sanitizeBusStops(JSON.parse(localStorage.getItem('busStopSelections') || '[]'));
+        selections.forEach(selection => {
+            const known = allBusStops.find(stop => stop.BusStopCode === selection.code);
+            addToBasket(selection.code, known ? known.Description : selection.description, false);
+            originalSelections.add(selection.code);
+        });
+    } catch {
+        console.log('No valid local selections found');
     }
 }
 
@@ -473,6 +449,8 @@ function hideDropdown(dropdown) {
 }
 
 function addToBasket(code, description, triggerChangeDetection = true) {
+    if (typeof code !== 'string' || !/^\d{5}$/.test(code) || selectedBusStops.size >= 20) return;
+    description = typeof description === 'string' ? description.slice(0, 200) : `Stop ${code}`;
     // Check if already selected
     if (selectedBusStops.has(code)) {
         console.log(`Bus stop ${code} already selected`);
@@ -494,14 +472,22 @@ function addToBasket(code, description, triggerChangeDetection = true) {
     item.className = 'selected-item';
     item.dataset.code = code;
     
-    item.innerHTML = `
-        <span class=\"selected-item-text\">
-            <strong>${code}</strong><br>
-            <small>${description}</small>
-        </span>
-        <button type=\"button\" class=\"remove-item\" aria-label=\"Remove ${code} - ${description}\" title=\"Remove\" onclick=\"removeFromBasket('${code}')\">×</button>
-    `;
-    
+    const label = document.createElement('span');
+    label.className = 'selected-item-text';
+    const number = document.createElement('strong');
+    number.textContent = code;
+    const details = document.createElement('small');
+    details.textContent = description;
+    label.append(number, document.createElement('br'), details);
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'remove-item';
+    remove.setAttribute('aria-label', `Remove ${code} - ${description}`);
+    remove.title = 'Remove';
+    remove.textContent = '×';
+    remove.addEventListener('click', () => removeFromBasket(code));
+    item.append(label, remove);
+
     basket.appendChild(item);
     
     if (triggerChangeDetection) {
@@ -601,6 +587,7 @@ function checkForChanges() {
 
 async function saveSelections(saveStatus) {
     const saveButton = document.getElementById('saveChanges');
+    const originalLabel = 'Apply Changes';
     const aqicnInput = document.getElementById('aqicnForecastUrl');
     let aqicnUrl = aqicnInput.value.trim();
     try {
@@ -614,7 +601,6 @@ async function saveSelections(saveStatus) {
     
     try {
         // Disable button during save
-    const originalLabel = 'Apply Changes';
     saveButton.disabled = true;
     saveButton.textContent = 'Saving...';
     // prepare status container
@@ -645,25 +631,6 @@ async function saveSelections(saveStatus) {
             } else {
                 localStorage.removeItem('calendarUrl');
             }
-        }
-        
-        // Also save to backend (as backup/fallback)
-        try {
-            const response = await fetch('/bus-stop-selections', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(selectionsArray)
-            });
-            
-            if (response.ok) {
-                console.log('Selections saved to backend successfully');
-            } else {
-                console.warn('Failed to save to backend, but localStorage save succeeded');
-            }
-        } catch (backendError) {
-            console.warn('Backend save failed, but localStorage save succeeded:', backendError);
         }
         
         // Update original selections to match current

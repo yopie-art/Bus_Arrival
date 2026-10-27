@@ -48,6 +48,8 @@ test('station pages retain West identity and request that station forecast witho
     const result = await fetchForecast(stationUrl, async (requested, options) => {
         requests.push(requested);
         assert.equal(options.redirect, 'error');
+        assert.equal(options.compress, false);
+        assert.equal(options.headers['Accept-Encoding'], 'identity');
         return { ok: true, text: async () => requested === stationUrl
             ? `<script>try { setWidgetAqiGraphModel(${JSON.stringify(station)}); } catch(e) {}</script>`
             : JSON.stringify(payload) };
@@ -138,6 +140,7 @@ test('fetches only the validated URL, refuses redirects and propagates upstream 
     await assert.rejects(fetchForecast(url, async () => ({ ok: false, status: 503 })), /503/);
     await assert.rejects(fetchForecast(url, async () => ({ ok: true, text: async () => '<html>No forecast</html>' })), /not found/);
     await assert.rejects(fetchForecast(url, async () => ({ ok: true, text: async () => 'x'.repeat(2097153) })), /too large/);
+    await assert.rejects(fetchForecast(url, async () => ({ ok: true, headers: new Headers({ 'content-encoding': 'br' }), text: async () => assert.fail('must not read compressed data') })), /Compressed/);
 });
 
 test('a slow upstream request is aborted after ten seconds', async t => {

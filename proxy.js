@@ -1,277 +1,160 @@
-// Remove static bus stop lookup, add dynamic fetch
-const API_KEY = process.env.LTA_API_KEY || '9X/bK+BuRLK8mOslIvs9TA==';
-const BUS_STOPS_API = 'https://datamall2.mytransport.sg/ltaodataservice/BusStops';
-
-// In-memory cache for bus stops
-let cachedBusStops = null;
-let cachedBusStopsTime = 0;
-const ONE_DAY_MS = 24 * 60 * 60 * 1000;
-
-// Load bus stops with region data from local file if available
-let localBusStops = null;
-try {
-    const fs = require('fs');
-    const path = require('path');
-    const busStopsPath = path.join(__dirname, 'bus_stops.json');
-    if (fs.existsSync(busStopsPath)) {
-        localBusStops = JSON.parse(fs.readFileSync(busStopsPath, 'utf8'));
-        console.log(`Loaded ${localBusStops.length} bus stops with region data from local file`);
-    }
-} catch (error) {
-    console.log('Local bus stops file not found, will use API');
-}
-
-async function fetchAllBusStops() {
-    // Use local data if available
-    if (localBusStops) {
-        return localBusStops;
-    }
-    
-    // Fallback to API cache
-    const now = Date.now();
-    if (cachedBusStops && (now - cachedBusStopsTime < ONE_DAY_MS)) {
-        return cachedBusStops;
-    }
-    let allStops = [];
-    let skip = 0;
-    let hasMore = true;
-    while (hasMore) {
-        const res = await fetch(`${BUS_STOPS_API}?$skip=${skip}`, {
-            headers: { 'AccountKey': API_KEY }
-        });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-        if (data.value && data.value.length > 0) {
-            allStops = allStops.concat(data.value);
-            skip += data.value.length;
-            if (data.value.length < 500) hasMore = false;
-        } else {
-            hasMore = false;
-        }
-    }
-    cachedBusStops = allStops;
-    cachedBusStopsTime = now;
-    return allStops;
-}
-
-// Function to determine majority region from selected bus stops
-function getMajorityRegion(busStopCodes) {
-    if (!localBusStops || !Array.isArray(busStopCodes) || busStopCodes.length === 0) {
-        return null;
-    }
-    
-    const regionCounts = {};
-    
-    busStopCodes.forEach(code => {
-        const busStop = localBusStops.find(stop => stop.BusStopCode === code);
-        if (busStop && busStop.Region) {
-            regionCounts[busStop.Region] = (regionCounts[busStop.Region] || 0) + 1;
-        }
-    });
-    
-    // Find the region with the most bus stops
-    let majorityRegion = null;
-    let maxCount = 0;
-    for (const [region, count] of Object.entries(regionCounts)) {
-        if (count > maxCount) {
-            maxCount = count;
-            majorityRegion = region;
-        }
-    }
-    
-    return majorityRegion;
-}
-// Simple Node.js Express proxy for LTA DataMall Bus Arrival API
+require('./config');
 const express = require('express');
-const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
-const cors = require('cors');
-
-// API_KEY is already declared above
-const PORT = 3000;
-
-const path = require('path');
-const app = express();
-app.use(cors());
-app.use(express.json()); // Add JSON parsing middleware
-// Serve static files from the public directory
-app.use(express.static(path.join(__dirname, 'public')));
-
-// Serve weather images from Weather_Images directory
-app.use('/Weather_Images', express.static(path.join(__dirname, 'Weather_Images')));
-
+const path = require('node:path');
+const fs = require('node:fs');
+const { getLtaApiKey } = require('./config');
+const { requestJson } = require('./http-client');
+const { normalizeCalendarUrl, fetchCalendar } = require('./calendar');
 const { fetchForecast } = require('./aqicn');
 const { normalizeUrl: normalizeAqicnUrl } = require('./public/aqicn-shared');
+const defaultFetch = (...args) => import('node-fetch').then(({ default: fetch }) => fetch(...args));
 
-app.get('/aqicn-forecast', async (req, res) => {
-    res.set('Cache-Control', 'no-store');
-    try {
-        normalizeAqicnUrl(req.query.url);
-    } catch (error) {
-        return res.status(400).json({ error: error.message });
-    }
-    try {
-        res.json(await fetchForecast(req.query.url, fetch));
-    } catch (error) {
-        console.warn('AQICN forecast unavailable:', error.message);
-        res.status(502).json({ error: 'AQICN forecast is temporarily unavailable. Weather will continue to display.' });
-    }
-});
+function createApp({ fetchImpl = defaultFetch, ltaApiKey = process.env.LTA_API_KEY, busStops, apiLimit = 120 } = {}) {
+    const app = express();
+    app.disable('x-powered-by');
+    const stopsPath = path.join(__dirname, 'bus_stops.json');
+    let stops = busStops || (fs.existsSync(stopsPath) ? JSON.parse(fs.readFileSync(stopsPath, 'utf8')) : null);
+    let stopsUpdated = 0;
+    const limits = new Map();
+    let inFlight = 0;
 
-// In-memory storage for bus stop selections (in production, you'd use a database)
-let busStopSelections = [];
-
-// API endpoint to get bus stop description(s)
-app.get('/bus-stop-description', async (req, res) => {
-    let codes = req.query.codes;
-    if (!codes) return res.status(400).json({ error: 'codes query param required' });
-    
-    try {
-        const stops = await fetchAllBusStops();
-        const stopMap = {};
-        for (const stop of stops) {
-            stopMap[stop.BusStopCode] = stop.Description;
-        }
-        
-        // Handle "all" parameter for settings page
-        if (codes === 'all') {
-            return res.json(stopMap);
-        }
-        
-        // Handle specific codes
-        if (!Array.isArray(codes)) codes = codes.split(',');
-        const result = {};
-        codes.forEach(code => {
-            result[code] = stopMap[code] || null;
+    app.use((req, res, next) => {
+        res.set({
+            'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer',
+            'X-Frame-Options': 'DENY',
+            'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://api-open.data.gov.sg; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
         });
-        res.json(result);
-    } catch (e) {
-        res.status(500).json({ error: 'Failed to fetch bus stop descriptions' });
-    }
-});
+        next();
+    });
 
-// API endpoint to get all bus stops (for settings page)
-app.get('/bus-stops-all', async (req, res) => {
-    try {
-        const stops = await fetchAllBusStops();
-        res.json(stops);
-    } catch (e) {
-        res.status(500).json({ error: 'Failed to fetch bus stops' });
-    }
-});
+    // APIs are used by this dashboard only. Do not expose private responses via CORS.
+    app.use((req, res, next) => {
+        const origin = req.get('origin');
+        if (origin) {
+            try {
+                const parsed = new URL(origin);
+                if (!['http:', 'https:'].includes(parsed.protocol) || parsed.host !== req.get('host')) return res.sendStatus(403);
+            } catch { return res.sendStatus(403); }
+        }
+        next();
+    });
 
-app.get('/bus-arrival', async (req, res) => {
-    const busStopCode = req.query.BusStopCode;
-    if (!busStopCode) {
-        return res.status(400).json({ error: 'BusStopCode is required' });
+    app.get('/healthz', (req, res) => res.json({ status: 'ok' }));
+
+    // Bound expensive upstream requests. No proxy IP headers are trusted for access control.
+    app.use(['/bus-arrival', '/aqicn-forecast', '/calendar-proxy'], (req, res, next) => {
+        res.set('Cache-Control', 'no-store');
+        const now = Date.now();
+        const client = req.socket.remoteAddress || 'unknown';
+        if (limits.size >= 1000) {
+            for (const [key, value] of limits) if (value.until <= now) limits.delete(key);
+            if (limits.size >= 1000 && !limits.has(client)) return res.status(429).json({ error: 'Please retry later.' });
+        }
+        let window = limits.get(client);
+        if (!window || window.until <= now) {
+            window = { count: 0, until: now + 60000 };
+            limits.set(client, window);
+        }
+        if (++window.count > apiLimit || inFlight >= 8) {
+            res.set('Retry-After', '60');
+            return res.status(429).json({ error: 'Too many requests. Please retry later.' });
+        }
+        inFlight++;
+        res.once('close', () => { inFlight--; });
+        next();
+    });
+
+    async function allStops() {
+        if (stops && (!stopsUpdated || Date.now() - stopsUpdated < 86400000)) return stops;
+        if (!ltaApiKey) throw new Error('LTA configuration is missing.');
+        const result = [];
+        for (let skip = 0; skip < 20000; skip += 500) {
+            const data = await requestJson(`https://datamall2.mytransport.sg/ltaodataservice/BusStops?$skip=${skip}`, {
+                fetchImpl, headers: { AccountKey: ltaApiKey }
+            });
+            if (!Array.isArray(data.value)) throw new Error('Invalid bus stops response.');
+            result.push(...data.value);
+            if (data.value.length < 500) break;
+        }
+        stops = result;
+        stopsUpdated = Date.now();
+        return stops;
     }
-    const url = `https://datamall2.mytransport.sg/ltaodataservice/v3/BusArrival?BusStopCode=${busStopCode}`;
-    try {
-        const response = await fetch(url, {
-            headers: {
-                'AccountKey': API_KEY,
-                'accept': 'application/json'
+
+    app.get('/bus-stops-all', async (req, res) => {
+        try { res.json(await allStops()); }
+        catch { res.status(502).json({ error: 'Unable to load bus stops.' }); }
+    });
+    app.get('/bus-stop-description', async (req, res) => {
+        const codes = req.query.codes;
+        if (typeof codes !== 'string' || (codes !== 'all' && !/^\d{5}(,\d{5}){0,19}$/.test(codes))) return res.sendStatus(400);
+        try {
+            const map = Object.fromEntries((await allStops()).map(stop => [stop.BusStopCode, stop.Description]));
+            res.json(codes === 'all' ? map : Object.fromEntries(codes.split(',').map(code => [code, map[code] || null])));
+        } catch { res.status(502).json({ error: 'Unable to load bus stop descriptions.' }); }
+    });
+    app.get('/majority-region', async (req, res) => {
+        const codes = req.query.codes;
+        if (typeof codes !== 'string' || !/^\d{5}(,\d{5}){0,19}$/.test(codes)) return res.sendStatus(400);
+        try {
+            const items = await allStops();
+            const counts = new Map();
+            for (const code of codes.split(',')) {
+                const region = items.find(stop => stop.BusStopCode === code)?.Region;
+                if (region) counts.set(region, (counts.get(region) || 0) + 1);
             }
-        });
-        const data = await response.json();
-        res.json(data);
-    } catch (err) {
-        console.error("Proxy error:", err);
-        res.status(500).json({ error: 'Failed to fetch from LTA API' });
-    }
-});
+            const majorityRegion = [...counts].sort((a, b) => b[1] - a[1])[0]?.[0] || null;
+            res.json({ majorityRegion, totalStops: codes.split(',').length });
+        } catch { res.status(502).json({ error: 'Unable to determine region.' }); }
+    });
+    app.get('/bus-arrival', async (req, res) => {
+        const code = req.query.BusStopCode;
+        if (typeof code !== 'string' || !/^\d{5}$/.test(code)) return res.sendStatus(400);
+        if (!ltaApiKey) return res.status(503).json({ error: 'Bus arrival service is not configured.' });
+        try {
+            res.json(await requestJson(`https://datamall2.mytransport.sg/ltaodataservice/v3/BusArrival?BusStopCode=${code}`, {
+                fetchImpl, headers: { AccountKey: ltaApiKey, Accept: 'application/json' }
+            }));
+        } catch { res.status(502).json({ error: 'Unable to load bus arrivals.' }); }
+    });
+    app.get('/aqicn-forecast', async (req, res) => {
+        try { normalizeAqicnUrl(req.query.url); }
+        catch { return res.status(400).json({ error: 'Enter a valid AQICN forecast or station URL.' }); }
+        try { res.json(await fetchForecast(req.query.url, fetchImpl)); }
+        catch { res.status(502).json({ error: 'AQICN forecast is temporarily unavailable. Weather will continue to display.' }); }
+    });
 
-// API endpoint to get bus stop selections
-app.get('/bus-stop-selections', (req, res) => {
-    res.json(busStopSelections);
-});
+    // The secret calendar address belongs in a small POST body, never in a request URL or log.
+    app.get('/calendar-proxy', (req, res) => res.status(410).json({ error: 'Please refresh the dashboard to update calendar access.' }));
+    app.post('/calendar-proxy', express.json({ limit: '8kb', inflate: false, strict: true }), async (req, res) => {
+        try { normalizeCalendarUrl(req.body?.url); }
+        catch { return res.status(400).json({ error: 'Enter a valid Google Calendar iCal address.' }); }
+        try {
+            res.type('text/calendar').send(await fetchCalendar(req.body.url, fetchImpl));
+        } catch {
+            // Exceptions can contain private URLs. Do not log or echo them.
+            res.status(502).json({ error: 'Unable to load the calendar. Please check its address and try again.' });
+        }
+    });
 
-// API endpoint to save bus stop selections
-app.post('/bus-stop-selections', (req, res) => {
-    try {
-        const selections = req.body;
-        
-        // Validate that it's an array of valid selections
-        if (!Array.isArray(selections)) {
-            return res.status(400).json({ error: 'Selections must be an array' });
-        }
-        
-        // Validate each selection has required fields
-        for (const selection of selections) {
-            if (!selection.code || !selection.description) {
-                return res.status(400).json({ error: 'Each selection must have code and description' });
-            }
-        }
-        
-        // Store the selections
-        busStopSelections = selections;
-        
-        console.log(`Saved ${selections.length} bus stop selections:`, selections.map(s => s.code).join(', '));
-        res.json({ success: true, count: selections.length });
-        
-    } catch (error) {
-        console.error('Error saving bus stop selections:', error);
-        res.status(500).json({ error: 'Failed to save selections' });
-    }
-});
+    // Bus-stop selections exist only in each browser; no shared read/write fallback.
+    app.use('/bus-stop-selections', (req, res) => res.sendStatus(404));
+    app.use(express.static(path.join(__dirname, 'public'), { dotfiles: 'deny' }));
+    app.use('/Weather_Images', express.static(path.join(__dirname, 'Weather_Images')));
+    app.use((error, req, res, next) => {
+        if (res.headersSent) return next(error);
+        const status = [400, 413, 415].includes(error.status) ? error.status : 500;
+        res.set('Cache-Control', 'no-store').status(status).json({ error: 'Request could not be processed.' });
+    });
+    return app;
+}
 
-// API endpoint to get majority region for selected bus stops
-app.get('/majority-region', (req, res) => {
-    try {
-        const busStopCodes = req.query.codes;
-        if (!busStopCodes) {
-            return res.status(400).json({ error: 'codes query parameter is required' });
-        }
-        
-        const codes = Array.isArray(busStopCodes) ? busStopCodes : busStopCodes.split(',');
-        const majorityRegion = getMajorityRegion(codes);
-        
-        res.json({ 
-            majorityRegion: majorityRegion,
-            totalStops: codes.length 
-        });
-        
-    } catch (error) {
-        console.error('Error determining majority region:', error);
-        res.status(500).json({ error: 'Failed to determine majority region' });
-    }
-});
-
-// Calendar proxy endpoint to handle CORS issues
-app.get('/calendar-proxy', async (req, res) => {
-    try {
-        const icalUrl = req.query.url;
-        
-        if (!icalUrl) {
-            return res.status(400).json({ error: 'url query parameter is required' });
-        }
-        
-        // Validate that it's a Google Calendar iCal URL for security
-        if (!icalUrl.includes('calendar.google.com/calendar/ical/')) {
-            return res.status(400).json({ error: 'Only Google Calendar iCal URLs are supported' });
-        }
-        
-        console.log('Proxying calendar request to:', icalUrl);
-        
-        // Fetch calendar data from Google
-        const response = await fetch(icalUrl);
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-        
-        const icalData = await response.text();
-        
-        // Set appropriate headers
-        res.set('Content-Type', 'text/calendar');
-        res.set('Access-Control-Allow-Origin', '*');
-        
-        res.send(icalData);
-        
-    } catch (error) {
-        console.error('Calendar proxy error:', error);
-        res.status(500).json({ error: 'Failed to fetch calendar data' });
-    }
-});
-
-app.listen(PORT, () => {
-    console.log(`Proxy server running at http://localhost:${PORT}`);
-});
+if (require.main === module) {
+    // Fail at startup rather than silently running arrivals with an embedded credential.
+    getLtaApiKey();
+    const port = Number(process.env.PORT) || 3000;
+    createApp().listen(port, '0.0.0.0', () => {
+        console.log(`Dashboard listening on port ${port}; Node.js ${process.version}`);
+    });
+}
+module.exports = { createApp };

@@ -6,9 +6,11 @@
     "start": "node proxy.js",
     "test": "node --test"
   },
+  "engines": {
+    "node": ">=22.23.4 <23"
+  },
   "dependencies": {
-    "cors": "^2.8.5",
-    "express": "^5.1.0",
-    "node-fetch": "^3.3.2"
+    "express": "5.3.0",
+    "node-fetch": "3.3.2"
   }
 }
